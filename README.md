@@ -17,8 +17,8 @@ git clone https://github.com/Ramsi88/trusty-contracts.git
 cd trusty-contracts
 
 # Install dependencies
-npm update
 npm i
+npm update
 
 # Compile contract bytecode
 npx hardhat compile
