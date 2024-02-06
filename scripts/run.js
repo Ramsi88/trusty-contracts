@@ -1,5 +1,3 @@
-//const hre = require("hardhat");
-//import hre from 'hardhat';
 const { BigNumber } = require("ethers");
 const { ethers } = require("hardhat");
 
@@ -127,25 +125,24 @@ const main = async () => {
     //console.log("receiver balance:",receiver);
   };
 
-  function hex_to_ascii(str1)
-  {
-	  var hex  = str1.toString();
-	  var str = '';
-	  for (var n = 0; n < hex.length; n += 2) {
-		  str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
-	  }
-	  return str;
+function hex_to_ascii(str1)
+{
+  const hex  = str1.toString();
+  let str = '';
+  for (let n = 0; n < hex.length; n += 2) {
+    str += String.fromCharCode(parseInt(hex.substr(n, 2), 16));
   }
-  
-  const runMain = async () => {
-    try {
-      await main();
-      process.exit(0);
-    } catch (error) {
-      console.log(error);
-      process.exit(1);
-    }
-  };
+  return str;
+}
+
+const runMain = async () => {
+  try {
+    await main();
+    process.exit(0);
+  } catch (error) {
+    console.log(error);
+    process.exit(1);
+  }
+};
   
 runMain();
-  
