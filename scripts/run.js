@@ -27,35 +27,35 @@ const main = async () => {
   console.log(`price:${actual_price}`)
   
   // Get addresses from accouns
-  let owners = [owner.address,randomPerson.address,other.address];
+  let owners = [owner.address,randomPerson.address, other.address];
   //console.log("Owner",owners);
 
   // Create a trusty
-  let create = await Contract.createContract(owners,2,{value:0}); //ethers.utils.parseEther("0.02")
+  let create = await Contract.createContract(owners, 2, {value:0}); //ethers.utils.parseEther("0.02")
   //let create = await Contract.createContract(owners,3);
   
   // Get created contract address
   let addr = await Contract.contracts(0);
-  console.log("created Trusty: ",addr);
+  console.log("created Trusty: ", addr);
 
   // Create a second trusty
-  let create2 = await Contract.createContract(owners,2,{value:0}); //ethers.utils.parseEther("0.02")
+  let create2 = await Contract.createContract(owners, 2, {value:0}); //ethers.utils.parseEther("0.02")
   let addr2 = await Contract.contracts(1);
-  console.log("created Trusty2: ",addr2);
+  console.log("created Trusty2: ", addr2);
 
   // Create a third trusty
-  let create3 = await Contract.createContract(owners,2,{value:0}); //ethers.utils.parseEther("0.02")
+  let create3 = await Contract.createContract(owners, 2, {value:0}); //ethers.utils.parseEther("0.02")
   let addr3 = await Contract.contracts(2);
-  console.log("created Trusty3: ",addr3);
+  console.log("created Trusty3: ", addr3);
 
   // Create the mix trusty
-  let createMix = await Contract.createContract([addr,addr2,addr3],2,{value:0}); //ethers.utils.parseEther("0.02")
+  let createMix = await Contract.createContract([addr, addr2, addr3], 2, {value:0}); //ethers.utils.parseEther("0.02")
   let addrMix = await Contract.contracts(3);
-  console.log("created TrustyMIX: ",addrMix);
+  console.log("created TrustyMIX: ", addrMix);
 
   // Deposit into a Trusty
   let amount = '2';
-  let deposit = await Contract.depositContract(3,amount,{value: ethers.utils.parseEther(amount)});
+  let deposit = await Contract.depositContract(3, amount,{value: ethers.utils.parseEther(amount)});
   //let deposit = await Contract.depositContract({value: hre.ethers.utils.parseEther('2')});
 
   // Get the balance of a Trusty
@@ -99,17 +99,17 @@ const main = async () => {
 
   // Confirm a tx from an account of owners
   let txConfirm;
-  txConfirm = await Contract.connect(randomPerson).trustyConfirm(0,0);
+  txConfirm = await Contract.connect(randomPerson).trustyConfirm(0, 0);
   await txConfirm.wait();
 
   // Confirm a tx from another account of owners
   let txConfirm2;
-  txConfirm2 = await Contract.connect(other).trustyConfirm(0,0);
+  txConfirm2 = await Contract.connect(other).trustyConfirm(0, 0);
   await txConfirm2.wait();
 
   // Get Trusty txs status x2
   let txGet2;
-  txGet2 = await Contract.getTx(0,0);
+  txGet2 = await Contract.getTx(0, 0);
   //console.log("get TX2s:", txGet2);
 
   // Execute a tx
