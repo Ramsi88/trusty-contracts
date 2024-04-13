@@ -168,9 +168,12 @@ contract Trusty {
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
         );
+        
         require(success, "tx failed");
 
         transaction.executed = true;
+        
+        transaction.timestamp = block.timestamp;
         
         emit ExecuteTransaction(tx.origin, _txIndex);
     }    
@@ -206,7 +209,7 @@ contract Trusty {
     * @param _txIndex The index of the transaction that needs to be retrieved
     * @custom:return Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight) {
+    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight, uint timestamp) {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
@@ -215,7 +218,8 @@ contract Trusty {
             transaction.data,
             transaction.executed,
             transaction.numConfirmations,
-            transaction.blockHeight
+            transaction.blockHeight,
+            transaction.timestamp
         );
     }
 

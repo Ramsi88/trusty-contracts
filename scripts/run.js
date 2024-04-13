@@ -189,7 +189,7 @@ const main = async () => {
     // Execute a tx
     const txExe = await Contract.connect(owner).trustyExecute(0,0);
     await txExe.wait();
-    //console.log("[Executed TX hash]:", txExe.hash);
+    console.log("[Executed TX hash]:", txExe.hash);
 
     // Check the received amount
     const receiver = await hre.ethers.provider.getBalance(other.address);
@@ -197,7 +197,9 @@ const main = async () => {
 
     // Get Trusty txs status x2
     const txGet2 = await Contract.getTx(0, 0);
-    //console.log("[get TX status updated]:", txGet2);    
+    console.log("[get TX status updated]:", txGet2);
+    console.log(parseInt(txGet2[6]))
+    console.log(new Date(parseInt(txGet2[6])))
   });
 
   //const absoluteTimelock = await Trusty.absolute_timelock();
