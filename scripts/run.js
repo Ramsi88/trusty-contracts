@@ -102,10 +102,10 @@ const main = async () => {
   console.log(`[ERC20 address]: ${erc20Addr}`)
 
   // Create a Trusty multisignature
-  const create = await Contract.createContract([...owners], 2, "first", [anonymous.address,"0xeDaCEf763B85597A517061D276D61947610411D1"], recoveryAddr, BLOCKLOCK, {value:0}); //ethers.utils.parseEther("0.02")
+  const create = await Contract.createContract([...owners], 2, "first",/*  [anonymous.address,"0xeDaCEf763B85597A517061D276D61947610411D1"], recoveryAddr, BLOCKLOCK, */ {value:0}); //ethers.utils.parseEther("0.02")
   //const create = await Contract.createContract(owners, 2, "first", [anonymous.address], {value:0}); //ethers.utils.parseEther("0.02")
   
-  const Trusty = await ContractTrusty.deploy(owners, 2, "SingleTrusty", [anonymous.address], recoveryAddr, BLOCKLOCK, {value:0});
+  const Trusty = await ContractTrusty.deploy(owners, 2, "SingleTrusty",/*  [anonymous.address], recoveryAddr, BLOCKLOCK, */ {value:0});
   await Trusty.deployed();
 
   // Get created contract address
@@ -113,19 +113,19 @@ const main = async () => {
   console.log("[Trusty address]: ", addr);
 
   // Create a second Trusty
-  const create2 = await Contract.createContract([...owners], 2, "second", [anonymous.address, ...owners], recoveryAddr, BLOCKLOCK, {value:0});
+  const create2 = await Contract.createContract([...owners], 2, "second",/*  [anonymous.address, ...owners], recoveryAddr, BLOCKLOCK, */ {value:0});
 
   // Retrieve the contract's address from Factory calling the method `contracts()` and passing the index number
   const addr2 = await Contract.contracts(1);
   console.log("[Trusty2 address]: ", addr2);
 
   // Create a third Trusty
-  const create3 = await Contract.createContract([...owners], 2, "third", [...owners], recoveryAddr, BLOCKLOCK, {value:0}); 
+  const create3 = await Contract.createContract([...owners], 2, "third",/*  [...owners], recoveryAddr, BLOCKLOCK, */ {value:0}); 
   const addr3 = await Contract.contracts(2);
   console.log("[Trusty3 address]: ", addr3);
 
   // Create a Trusty whose owners are 1 Externally Owned Account (with private keys) plus the previous Trusties created (without private keys) resulting in a chained tree of Trusty multisignatures 
-  const createMix = await Contract.createContract([addr, addr2, addr3], 2, "mixed", [addr, addr2, addr3], recoveryAddr, BLOCKLOCK, {value:0}); 
+  const createMix = await Contract.createContract([addr, addr2, addr3], 2, "mixed",/*  [addr, addr2, addr3], recoveryAddr, BLOCKLOCK, */ {value:0}); 
   const trustyMixAddr = await Contract.contracts(3);
   console.log("[TrustyMIX address]: ", trustyMixAddr);
 
@@ -164,11 +164,11 @@ const main = async () => {
 
   //const setWhitelist = await Contract.connect(owner).addToTrustyWhitelist(0,[anonymous.address]);
 
-  const getWhitelist = await Contract.connect(owner).getTrustyWhitelist(0)
+  //const getWhitelist = await Contract.connect(owner).getTrustyWhitelist(0)
   //console.log(`[whitelisted]: ${getWhitelist}`)
 
   // Propose to submit a tx from a Trusty
-  const txSend = await Contract.connect(owner).trustySubmit(0, anonymous.address, 1, "0xa9059cbb000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000", 0);
+  const txSend = await Contract.connect(owner).trustySubmit(0, anonymous.address, 1, "0xa9059cbb000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000");
   //const txSend = await Contract.connect(owner).trustySubmit(1, anonymous.address, 1, Buffer.from("This is a test for catching calldata..."), 0);
   //const txSend = await Contract.connect(owner).trustySubmit(1, anonymous.address, 1, 0x0, 0);
   await txSend.wait();
@@ -200,8 +200,8 @@ const main = async () => {
     //console.log("[get TX status updated]:", txGet2);    
   });
 
-  const absoluteTimelock = await Trusty.absolute_timelock();
-  console.log(`[Absolute Timelock]: ${absoluteTimelock}`);
+  //const absoluteTimelock = await Trusty.absolute_timelock();
+  //console.log(`[Absolute Timelock]: ${absoluteTimelock}`);
 
   const totTrusty = await Contract.totalTrusty();
   for (let i = 0; i < totTrusty; i++) {
