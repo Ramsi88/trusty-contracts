@@ -17,7 +17,7 @@ import "./TrustyAdvanced.sol";
 contract TrustyFactoryAdvanced is Ownable {
 
     // Trusty indexed array
-    //TrustySimple[] public contracts;
+    TrustySimple[] public contractsSimple;
     TrustyAdvanced[] public contracts;
 
     uint256 public totalTrusty = 0;
@@ -49,7 +49,32 @@ contract TrustyFactoryAdvanced is Ownable {
         whitelistedAddresses[msg.sender] = true;
         numAddressesWhitelisted++;
     }
+    /*
+    function createContract(address[] memory _owners, uint _nTX, string memory _id) payable public notWhitelisted {
+        if(_priceEnabled) {
+            require(msg.value >= _price, "Ether sent is not enough");
+        }
+        TrustySimple trusty = new TrustySimple(_owners, _nTX, _id);
 
+        contractsSimple.push(trusty);
+
+        trustyID[totalTrusty] = _id;
+
+        whitelistedAddresses[address(trusty)] = true;
+        numAddressesWhitelisted++;
+
+        for (uint i = 0; i < _owners.length; i++) {
+            if(!whitelistedAddresses[_owners[i]]) {
+                whitelistedAddresses[_owners[i]] = true;
+                numAddressesWhitelisted++;
+            }            
+        }
+
+        trustyOwner[totalTrusty] = _owners;
+
+        totalTrusty++;
+    }
+    */
     /**
     * @notice This method is used to create a Trusty multisignature
     * @param _owners Array of owners' addresses
@@ -82,37 +107,6 @@ contract TrustyFactoryAdvanced is Ownable {
     }
 
     /**
-    * @notice This method is used to create a Trusty multisignature
-    * @param _owners Array of owners' addresses
-    * @param _nTX Minimum number of confirmations required to execute a transaction
-    
-    function createContractB(address[] memory _owners, uint _nTX, string memory _id, address[] memory _whitelist, address _recovery, uint _blocklock) payable public notWhitelisted {
-        if(_priceEnabled) {
-            require(msg.value >= _price, "Ether sent is not enough");
-        }
-
-        //TrustyAdvanced trusty = new TrustyAdvanced(_owners, _nTX, _id, _whitelist, _recovery, _blocklock);
-        
-        contractsAdvanced.push(trusty);
-
-        trustyID[totalTrusty] = _id;
-
-        whitelistedAddresses[address(trusty)] = true;
-        numAddressesWhitelisted++;
-
-        for (uint i = 0; i < _owners.length; i++) {
-            if(!whitelistedAddresses[_owners[i]]) {
-                whitelistedAddresses[_owners[i]] = true;
-                numAddressesWhitelisted++;
-            }            
-        }
-
-        trustyOwner[totalTrusty] = _owners;
-
-        totalTrusty++;
-    }
-    */
-    /**
     * @notice This method is used to make a deposit on a Trusty multisignature
     * @param _contractIndex The Trusty contract index that will be funded
     * @param _amount Amount of ether to send
@@ -128,7 +122,6 @@ contract TrustyFactoryAdvanced is Ownable {
     * @return address[] Returns the Trusty's owners' addresses array
     */
     function contractReadOwners(uint256 _contractIndex) public view returns(address[] memory) {
-        //Trusty trusty = Trusty(Trusty[_contractIndex]);
         return contracts[_contractIndex].getOwners();
     }
 
@@ -138,7 +131,6 @@ contract TrustyFactoryAdvanced is Ownable {
     * @return uint256 Returns the Trusty's balance
     */
     function contractReadBalance(uint256 _contractIndex) public view returns(uint256) {
-        //Trusty trusty = Trusty(Trusty[_contractIndex]);
         return contracts[_contractIndex].getBalance();
     }
 
@@ -168,7 +160,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     * @custom:return bool Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTx(uint256 _contractIndex, uint _txIndex) public view returns(address, uint, bytes memory, bool, uint, uint, uint) {
+    function getTx(uint256 _contractIndex, uint _txIndex) public view returns(address, uint, bytes memory, bool, uint, uint, uint, uint) {
         return contracts[_contractIndex].getTransaction(_txIndex);
     }
     

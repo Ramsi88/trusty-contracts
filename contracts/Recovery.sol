@@ -66,7 +66,7 @@ contract Recovery {
     }
 
     modifier onlyOwner() {
-        require(isOwner[msg.sender] || isOwner[tx.origin], "not owner");
+        require(isOwner[msg.sender], "not owner");
         _;
     }
 
@@ -81,7 +81,7 @@ contract Recovery {
     }
 
     modifier notConfirmed(uint _txIndex) {
-        require(!isConfirmed[_txIndex][tx.origin], "tx already confirmed");
+        require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
         _;
     }
 
@@ -106,10 +106,6 @@ contract Recovery {
             require(!isOwner[owner], "owner not unique");
 
             isOwner[owner] = true;
-
-            // Owners Auto-whitelisting
-            //whitelistedToAddresses[owner] = true;
-            //whitelistedAddressesList.push(owner);
 
             owners.push(owner);
         }
@@ -145,7 +141,7 @@ contract Recovery {
             })
         );
 
-        emit SubmitTransaction(tx.origin, txIndex, _to, _value, _data);
+        emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
     }
 
     /**
@@ -156,9 +152,9 @@ contract Recovery {
     function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
-        isConfirmed[_txIndex][tx.origin] = true;
+        isConfirmed[_txIndex][msg.sender] = true;
 
-        emit ConfirmTransaction(tx.origin, _txIndex);
+        emit ConfirmTransaction(msg.sender, _txIndex);
     }
 
     /**
@@ -169,12 +165,12 @@ contract Recovery {
     function revokeConfirmation(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
 
-        require(isConfirmed[_txIndex][tx.origin], "tx not confirmed");
+        require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
 
         transaction.numConfirmations -= 1;
-        isConfirmed[_txIndex][tx.origin] = false;
+        isConfirmed[_txIndex][msg.sender] = false;
 
-        emit RevokeConfirmation(tx.origin, _txIndex);
+        emit RevokeConfirmation(msg.sender, _txIndex);
     }
 
     /**
@@ -198,8 +194,10 @@ contract Recovery {
         require(success, "tx failed");
 
         transaction.executed = true;
+
+        transaction.timestamp = block.timestamp;
         
-        emit ExecuteTransaction(tx.origin, _txIndex);
+        emit ExecuteTransaction(msg.sender, _txIndex);
     }    
 
     /**
@@ -233,7 +231,7 @@ contract Recovery {
     * @param _txIndex The index of the transaction that needs to be retrieved
     * @custom:return Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight) {
+    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight, uint timestamp) {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
@@ -242,7 +240,8 @@ contract Recovery {
             transaction.data,
             transaction.executed,
             transaction.numConfirmations,
-            transaction.blockHeight
+            transaction.blockHeight,
+            transaction.timestamp
         );
     }
 
@@ -305,51 +304,13 @@ contract Recovery {
     * @notice Fallback function triggered when the contract is receiving Ether and msg.data is empty
     */
     receive() external payable {
-        emit Deposit(tx.origin, msg.value, address(this).balance);
+        emit Deposit(msg.sender, msg.value, address(this).balance);
     }
 
     /**
     * @notice Fallback function triggered when the contract is receiving Ether and msg.data is not empty
     */
     fallback() external payable {
-        emit Deposit(tx.origin, msg.value, address(this).balance);
+        emit Deposit(msg.sender, msg.value, address(this).balance);
     }
-
-    /**
-    * @notice Utility function to decode and check erc20 serialized calldata
-    
-    function checkData(bytes calldata encodedData) external view returns (bool) {
-        uint len = encodedData.length;
-
-        bool decoded = false;
-        if (len >= 4 && len % 2 == 0) {
-            bytes memory selector = bytes(abi.encode(bytes(encodedData[0:4])));
-            bytes memory transfer = bytes(abi.encode(bytes(hex"a9059cbb")));
-            bytes memory approve = bytes(abi.encode(bytes(hex"095ea7b3")));
-            bytes memory transferFrom = bytes(abi.encode(bytes(hex"23b872dd")));
-            bytes memory mint = bytes(abi.encode(bytes(hex"40c10f19")));
-            if (
-                keccak256(transfer) == keccak256(selector) || 
-                keccak256(approve) == keccak256(selector) ||
-                keccak256(transferFrom) == keccak256(selector) ||
-                keccak256(mint) == keccak256(selector)
-            ) {
-                bool passed = bool(
-                    keccak256(transfer) == keccak256(selector) || 
-                    keccak256(approve) == keccak256(selector) || 
-                    keccak256(transferFrom) == keccak256(selector) ||
-                    keccak256(mint) == keccak256(selector)
-                );
-                
-                if (passed) {
-                    address payable to = abi.decode(encodedData[4:],(address));
-                    require(whitelistedToAddresses[to], "Calldata not allowed or address not whitelisted!");
-                    require(!blacklistedToAddresses[to], "Address in calldata is blacklisted!");
-                    decoded = true;
-                }
-            }
-        }
-        return decoded;
-    }
-    */
 }

@@ -37,6 +37,7 @@ contract TrustySimple {
         bool executed;
         uint numConfirmations;     
         uint blockHeight;
+        uint timestamp;
     }
 
     // mapping from tx index => owner => bool
@@ -44,17 +45,8 @@ contract TrustySimple {
 
     Transaction[] public transactions;
 
-    // blacklist
-    mapping(address => bool) public blacklistedToAddresses;
-    address[] public blacklistedAddressesList;
-
-    modifier notBlacklisted(address toAddress) {
-        require(!blacklistedToAddresses[toAddress], "Address is blacklisted!");
-        _;
-    }
-
     modifier onlyOwner() {
-        require(isOwner[msg.sender] || isOwner[tx.origin], "not owner");
+        require(isOwner[msg.sender], "not owner");
         _;
     }
 
@@ -69,7 +61,7 @@ contract TrustySimple {
     }
 
     modifier notConfirmed(uint _txIndex) {
-        require(!isConfirmed[_txIndex][tx.origin], "tx already confirmed");
+        require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
         _;
     }
 
@@ -110,7 +102,7 @@ contract TrustySimple {
     * @param _data Optional data field or calldata to another contract
     * @dev _data can be used as "bytes memory" or "bytes calldata"
     */
-    function submitTransaction(address _to, uint _value, bytes calldata _data) public onlyOwner notBlacklisted(_to) {
+    function submitTransaction(address _to, uint _value, bytes calldata _data) public onlyOwner {
 
         uint txIndex = transactions.length;
 
@@ -121,11 +113,12 @@ contract TrustySimple {
                 data: _data,
                 executed: false,
                 numConfirmations: 0,
-                blockHeight: block.number
+                blockHeight: block.number,
+                timestamp: block.timestamp
             })
         );
 
-        emit SubmitTransaction(tx.origin, txIndex, _to, _value, _data);
+        emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
     }
 
     /**
@@ -136,9 +129,9 @@ contract TrustySimple {
     function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
-        isConfirmed[_txIndex][tx.origin] = true;
+        isConfirmed[_txIndex][msg.sender] = true;
 
-        emit ConfirmTransaction(tx.origin, _txIndex);
+        emit ConfirmTransaction(msg.sender, _txIndex);
     }
 
     /**
@@ -149,12 +142,12 @@ contract TrustySimple {
     function revokeConfirmation(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
 
-        require(isConfirmed[_txIndex][tx.origin], "tx not confirmed");
+        require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
 
         transaction.numConfirmations -= 1;
-        isConfirmed[_txIndex][tx.origin] = false;
+        isConfirmed[_txIndex][msg.sender] = false;
 
-        emit RevokeConfirmation(tx.origin, _txIndex);
+        emit RevokeConfirmation(msg.sender, _txIndex);
     }
 
     /**
@@ -164,8 +157,6 @@ contract TrustySimple {
     */
     function executeTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
-
-        require(!blacklistedToAddresses[transaction.to], "Cannot execute, address/contract is blacklisted!");
         
         require(
             transaction.numConfirmations >= numConfirmationsRequired,
@@ -178,8 +169,10 @@ contract TrustySimple {
         require(success, "tx failed");
 
         transaction.executed = true;
+
+        transaction.timestamp = block.timestamp;
         
-        emit ExecuteTransaction(tx.origin, _txIndex);
+        emit ExecuteTransaction(msg.sender, _txIndex);
     }    
 
     /**
@@ -213,7 +206,7 @@ contract TrustySimple {
     * @param _txIndex The index of the transaction that needs to be retrieved
     * @custom:return Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight) {
+    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight, uint timestamp) {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
@@ -222,43 +215,22 @@ contract TrustySimple {
             transaction.data,
             transaction.executed,
             transaction.numConfirmations,
-            transaction.blockHeight
-            //transaction.timeLock
+            transaction.blockHeight,
+            transaction.timestamp
         );
     } 
-
-    /**
-    * @notice This method is used by the Trusty's owner to get the blacklisted addresses
-    * @custom:owner Can be called by owner
-    */
-    function getBlacklist() public view onlyOwner returns(address[] memory) {
-        return blacklistedAddressesList;
-    }
-
-    /**
-    * @notice addAddressToBlacklist - This function adds the address to the blacklist
-    * @custom:param `address[]` An array of addresses to be removed from blacklist
-    * @custom:owner Can be called by owner
-    */
-    function addAddressToBlacklist(address[] memory addresses) public onlyOwner {
-        for (uint i = 0; i < addresses.length; i++) {
-            require(!blacklistedToAddresses[addresses[i]], "Duplicate address in blacklist");
-            blacklistedToAddresses[addresses[i]] = true;
-            blacklistedAddressesList.push(addresses[i]);
-        }        
-    }
 
     /**
     * @notice Fallback function triggered when the contract is receiving Ether and msg.data is empty
     */
     receive() external payable {
-        emit Deposit(tx.origin, msg.value, address(this).balance);
+        emit Deposit(msg.sender, msg.value, address(this).balance);
     }
 
     /**
     * @notice Fallback function triggered when the contract is receiving Ether and msg.data is not empty
     */
     fallback() external payable {
-        emit Deposit(tx.origin, msg.value, address(this).balance);
+        emit Deposit(msg.sender, msg.value, address(this).balance);
     }
 }
