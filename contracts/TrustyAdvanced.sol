@@ -136,10 +136,6 @@ contract TrustyAdvanced {
 
             isOwner[owner] = true;
 
-            // Owners Auto-whitelisting
-            //whitelistedToAddresses[owner] = true;
-            //whitelistedAddressesList.push(owner);
-
             owners.push(owner);
         }
 
@@ -366,19 +362,6 @@ contract TrustyAdvanced {
     function addAddressToWhitelist(address[] memory addresses) private {
         for (uint i = 0; i < addresses.length; i++) {
             require(!whitelistedToAddresses[addresses[i]], "Each address must be unique to be in whitelist");
-            whitelistedToAddresses[addresses[i]] = true;
-            whitelistedAddressesList.push(addresses[i]);
-        }        
-    }
-
-    /**
-    * @notice addAddressToRecoverWhitelist - This function adds the address of the sender to the whitelist
-    * @custom:param `address[]` An array of addresses to be whitelisted
-    * @custom:owner Can be called by owner
-    */
-    function addAddressToRecoveryWhitelist(address[] memory addresses) public onlyOwner {        
-        for (uint i = 0; i < addresses.length; i++) {
-            // Add the address which called the function to the whitelistedAddress array
             whitelistedToAddresses[addresses[i]] = true;
             whitelistedAddressesList.push(addresses[i]);
         }        
