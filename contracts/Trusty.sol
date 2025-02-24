@@ -28,6 +28,7 @@ contract Trusty {
     error TimeLock(string err,int blockLeft);
 
     // Variable Slots
+    address proxy;
     address[] public owners;
     mapping(address => bool) public isOwner;
     uint public numConfirmationsRequired;
@@ -48,7 +49,7 @@ contract Trusty {
     Transaction[] public transactions;
 
     modifier onlyOwner() {
-        require(isOwner[msg.sender] || isOwner[tx.origin], "not owner");
+        require(isOwner[msg.sender], "not owner");
         _;
     }
 
@@ -63,7 +64,7 @@ contract Trusty {
     }
 
     modifier notConfirmed(uint _txIndex) {
-        require(!isConfirmed[_txIndex][tx.origin], "tx already confirmed");
+        require(!isConfirmed[_txIndex][msg.sender], "tx already confirmed");
         _;
     }
 
@@ -72,6 +73,7 @@ contract Trusty {
         address[] memory _owners, 
         uint _numConfirmationsRequired, 
         string memory _id
+        //,address proxy
     ) {
         require(_owners.length > 0, "owners required");
         
@@ -92,9 +94,19 @@ contract Trusty {
             owners.push(owner);
         }
 
+        proxy = msg.sender;
+
         numConfirmationsRequired = _numConfirmationsRequired;
 
         id = _id;
+    }
+
+    function getCaller(address sender, address source) internal view returns(address) {
+        if (sender == proxy) {
+            return source;
+        } else {
+            return sender;
+        }
     }
 
     /**
@@ -105,7 +117,7 @@ contract Trusty {
     * @dev _data can be used as "bytes memory" or "bytes calldata"
     */
     function submitTransaction(address _to, uint _value, bytes calldata _data) public onlyOwner {
-
+        
         uint txIndex = transactions.length;
 
         transactions.push(
@@ -120,7 +132,29 @@ contract Trusty {
             })
         );
 
-        emit SubmitTransaction(tx.origin, txIndex, _to, _value, _data);
+        emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+    }
+
+    function submitTransaction(address caller, address _to, uint _value, bytes calldata _data) public /* onlyOwner */ {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+        
+        uint txIndex = transactions.length;
+
+        transactions.push(
+            Transaction({
+                to: _to,
+                value: _value,
+                data: _data,
+                executed: false,
+                numConfirmations: 0,
+                blockHeight: block.number,
+                timestamp: block.timestamp
+            })
+        );
+
+        emit SubmitTransaction(origin, txIndex, _to, _value, _data);
     }
 
     /**
@@ -131,9 +165,23 @@ contract Trusty {
     function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
-        isConfirmed[_txIndex][tx.origin] = true;
+        isConfirmed[_txIndex][msg.sender] = true;
 
-        emit ConfirmTransaction(tx.origin, _txIndex);
+        emit ConfirmTransaction(msg.sender, _txIndex);
+    }
+
+    function confirmTransaction(address caller, uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
+        require(!isConfirmed[_txIndex][origin], "tx already confirmed");
+
+        Transaction storage transaction = transactions[_txIndex];
+        transaction.numConfirmations += 1;
+        isConfirmed[_txIndex][origin] = true;
+
+        emit ConfirmTransaction(origin, _txIndex);
     }
 
     /**
@@ -144,12 +192,27 @@ contract Trusty {
     function revokeConfirmation(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
         Transaction storage transaction = transactions[_txIndex];
 
-        require(isConfirmed[_txIndex][tx.origin], "tx not confirmed");
+        require(isConfirmed[_txIndex][msg.sender], "tx not confirmed");
 
         transaction.numConfirmations -= 1;
-        isConfirmed[_txIndex][tx.origin] = false;
+        isConfirmed[_txIndex][msg.sender] = false;
 
-        emit RevokeConfirmation(tx.origin, _txIndex);
+        emit RevokeConfirmation(msg.sender, _txIndex);
+    }
+
+    function revokeConfirmation(address caller, uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
+        Transaction storage transaction = transactions[_txIndex];
+
+        require(isConfirmed[_txIndex][origin], "tx not confirmed");
+
+        transaction.numConfirmations -= 1;
+        isConfirmed[_txIndex][origin] = false;
+
+        emit RevokeConfirmation(origin, _txIndex);
     }
 
     /**
@@ -175,8 +238,33 @@ contract Trusty {
         
         transaction.timestamp = block.timestamp;
         
-        emit ExecuteTransaction(tx.origin, _txIndex);
-    }    
+        emit ExecuteTransaction(msg.sender, _txIndex);
+    }
+
+    function executeTransaction(address caller, uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+        
+        Transaction storage transaction = transactions[_txIndex];
+        
+        require(
+            transaction.numConfirmations >= numConfirmationsRequired,
+            "cannot execute tx due to number of confirmation required"
+        );
+
+        (bool success, ) = transaction.to.call{value: transaction.value}(
+            transaction.data
+        );
+        
+        require(success, "tx failed");
+
+        transaction.executed = true;
+        
+        transaction.timestamp = block.timestamp;
+        
+        emit ExecuteTransaction(origin, _txIndex);
+    }
 
     /**
     * @notice Method used to execute the transaction with index `_txIndex` if it exists and is not executed yet.
@@ -227,13 +315,13 @@ contract Trusty {
     * @notice Fallback function triggered when the contract is receiving Ether and msg.data is empty
     */
     receive() external payable {
-        emit Deposit(tx.origin, msg.value, address(this).balance);
+        emit Deposit(msg.sender, msg.value, address(this).balance);
     }
 
     /**
     * @notice Fallback function triggered when the contract is receiving Ether and msg.data is not empty
     */
     fallback() external payable {
-        emit Deposit(tx.origin, msg.value, address(this).balance);
+        emit Deposit(msg.sender, msg.value, address(this).balance);
     }
 }

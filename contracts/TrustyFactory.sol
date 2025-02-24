@@ -35,7 +35,7 @@ contract TrustyFactory is Ownable {
     mapping(uint256 => address[]) public trustyOwner;
 
     modifier notWhitelisted {
-        require(whitelistedAddresses[msg.sender] || whitelistedAddresses[tx.origin], "Not in the Factory Whitelist!");
+        require(whitelistedAddresses[msg.sender], "Not in the Factory Whitelist!"); // TODO: Contract to contract calldata
         _;
     }
 
@@ -124,7 +124,7 @@ contract TrustyFactory is Ownable {
     * @return bool Returns `true` if the caller is owner of the Trusty index specified
     */
     function imOwner(uint256 _contractIndex) public view returns(bool) {
-        return contracts[_contractIndex].isOwner(tx.origin);
+        return contracts[_contractIndex].isOwner(msg.sender);
     }
 
     /**
@@ -145,7 +145,16 @@ contract TrustyFactory is Ownable {
     * @param _data The data parameter can contains ordinary data or an encoded call to interact with another contract
     */
     function trustySubmit(uint256 _contractIndex, address _to, uint256 _value, bytes memory _data) public notWhitelisted {
-        contracts[_contractIndex].submitTransaction(_to, _value, _data);
+        bool found = false;
+        for (uint i = 0; i < trustyOwner[_contractIndex].length; i++) {
+            if (msg.sender == trustyOwner[_contractIndex][i]) {
+                found = true;
+                break;
+            }
+        }
+        require(found, "msg.sender not owner");
+        //contracts[_contractIndex].submitTransaction(_to, _value, _data);
+        contracts[_contractIndex].submitTransaction(msg.sender,_to, _value, _data);
     }
     
     /**
@@ -154,7 +163,7 @@ contract TrustyFactory is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     */
     function trustyConfirm(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
-        contracts[_contractIndex].confirmTransaction(_txIndex);
+        contracts[_contractIndex].confirmTransaction(msg.sender, _txIndex);
     }
 
     /**
@@ -163,7 +172,7 @@ contract TrustyFactory is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     */
     function trustyExecute(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
-        contracts[_contractIndex].executeTransaction(_txIndex);
+        contracts[_contractIndex].executeTransaction(msg.sender, _txIndex);
     }
 
     /**
@@ -172,7 +181,7 @@ contract TrustyFactory is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     */
     function trustyRevoke(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
-        contracts[_contractIndex].revokeConfirmation(_txIndex);
+        contracts[_contractIndex].revokeConfirmation(msg.sender, _txIndex);
     }
 
     /**

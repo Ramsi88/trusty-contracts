@@ -38,7 +38,7 @@ contract TrustyFactoryAdvanced is Ownable {
     mapping(uint256 => address[]) public trustyOwner;
 
     modifier notWhitelisted {
-        require(whitelistedAddresses[msg.sender] || whitelistedAddresses[tx.origin], "Not in the Factory Whitelist!");
+        require(whitelistedAddresses[msg.sender], "Not in the Factory Whitelist!");
         _;
     }
 
@@ -151,7 +151,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @return bool Returns `true` if the caller is owner of the Trusty index specified
     */
     function imOwner(uint256 _contractIndex) public view returns(bool) {
-        return contracts[_contractIndex].isOwner(tx.origin);
+        return contracts[_contractIndex].isOwner(msg.sender);
     }
 
     /**
