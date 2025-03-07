@@ -17,24 +17,24 @@ async function main() {
   
   for (var i = 0; i < nOwners; i++){
     const owner = prompt(`Address of the ${i}th owner: `);
-    if(!ethers.utils.isAddress(owner)){throw "You must enter a valid string address"}
+    if(!ethers.isAddress(owner)){throw "You must enter a valid string address"}
     owners.push(owner);
   }
 
   const whitelist = []
 
   const address = prompt(`Address to whitelist: `);
-  if(!ethers.utils.isAddress(address)){throw "You must enter a valid string address"}
+  if(!ethers.isAddress(address)){throw "You must enter a valid string address"}
   whitelist.push(address);
 
   while(prompt(`Would you like to add more addresses to whitelist? [y] or [press any button] to exit: `)==="y"?true:false) {
     const address = prompt(`Address to whitelist: `);
-    if(!ethers.utils.isAddress(address)){throw "You must enter a valid string address"}
+    if(!ethers.isAddress(address)){throw "You must enter a valid string address"}
     whitelist.push(address);
   }
 
   const recovery = prompt(`Insert the RECOVERY address: `)
-  if(!ethers.utils.isAddress(recovery)){throw "You must enter a valid string address"}
+  if(!ethers.isAddress(recovery)){throw "You must enter a valid string address"}
 
   const blocklock = parseInt(prompt('How many blocks until RECOVERY mode enabled? '));
   if(isNaN(blocklock)) {throw `You must use a valid number: ${parseInt(blocklock)}`}
@@ -54,10 +54,10 @@ async function main() {
 
   // here we deploy the contract
   const deployedTrustyContract = await trustyContract.deploy(owners, confirmations, name, whitelist, recovery, blocklock);
-  await deployedTrustyContract.deployed();
+  await deployedTrustyContract.waitForDeployment();
 
   // print the address of the deployed contract
-  console.log("TrustyAdvanced Contract Address:", deployedTrustyContract.address);
+  console.log("TrustyAdvanced Contract Address:", await deployedTrustyContract.getAddress());
 }
 
 // Call the main function and catch if there is any error

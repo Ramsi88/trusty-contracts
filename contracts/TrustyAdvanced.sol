@@ -1,6 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+
+interface IERC20 {
+    function balanceOf(address account) external view returns (uint);
+}
 
 /**
  * @title Trusty Advanced Multisignature
@@ -9,7 +15,7 @@ pragma solidity ^0.8.25;
  * @dev All function calls are meant to be called from the Factory, but the contract can also be deployed alone
  * Copyright (c) 2024 Ramzi Bougammoura
  */
-contract TrustyAdvanced {
+contract TrustyAdvanced is ReentrancyGuard {
     string public id;
 
     //Events
@@ -28,6 +34,7 @@ contract TrustyAdvanced {
     error TimeLock(string err,int blockLeft);
 
     // Variable Slots
+    address proxy;
     address[] public owners;
     mapping(address => bool) public isOwner;
     uint public numConfirmationsRequired;
@@ -40,13 +47,18 @@ contract TrustyAdvanced {
         uint numConfirmations;     
         uint blockHeight;
         uint timestamp;
-        uint timeLock;   
+        uint timeLock;  
+        bool exists;
+        uint index;
     }
+
+    uint txIndex = 0;
 
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    Transaction[] public transactions;
+    //Transaction[] public transactions;
+    mapping(uint => Transaction) public transactions;
 
     // whitelist
     mapping(address => bool) public whitelistedToAddresses;
@@ -58,7 +70,7 @@ contract TrustyAdvanced {
 
     // Absolute_timelock
     uint offset = 120; // Blocks required against an eventual fork
-    uint private blocklock;
+    uint public blocklock;
     uint public absolute_timelock;
 
     // Recovery
@@ -95,7 +107,8 @@ contract TrustyAdvanced {
     }
 
     modifier txExists(uint _txIndex) {
-        require(_txIndex < transactions.length, "tx does not exist");
+        //require(_txIndex < transactions.length, "tx does not exist");
+        require(transactions[_txIndex].exists, "tx does not exist");
         _;
     }
 
@@ -145,6 +158,8 @@ contract TrustyAdvanced {
 
         addAddressToWhitelist(whitelist);
 
+        proxy = msg.sender;
+
         numConfirmationsRequired = _numConfirmationsRequired;
 
         id = _id;
@@ -155,6 +170,14 @@ contract TrustyAdvanced {
         blocklock = _blocklock;
 
         unlock();
+    }
+
+    function getCaller(address sender, address source) internal view returns(address) {
+        if (sender == proxy) {
+            return source;
+        } else {
+            return sender;
+        }
     }
 
     /**
@@ -175,7 +198,8 @@ contract TrustyAdvanced {
     * @notice Method used by recovery address in Recovery scenario
     */
     function recover() public onlyRecover notUnlocked {
-        uint amount = address(this).balance;        
+        uint amount = address(this).balance;
+        require(amount > 0, "no amount");
         (bool success, ) = msg.sender.call{value: amount}("");
         require(success, "recover failed");
     }
@@ -183,11 +207,14 @@ contract TrustyAdvanced {
     /**
     * @notice Method used by recovery address in ERC20 Recovery scenario
     */
-    function recoverERC20(address _token) public onlyRecover notUnlocked {        
-        (bytes memory _dataApprove,) = encodeRecover(_token);
-        (,bytes memory _dataTransfer) = encodeRecover(_token);
-        (bool approveSuccess, ) = _token.call{value: 0}(_dataApprove);
-        require(approveSuccess, "recoverERC20 approve failed");
+    function recoverERC20(address _token) public onlyRecover notUnlocked {
+        uint balance = IERC20(_token).balanceOf(address(this));
+        require(balance > 0, "no amount");
+        //(bytes memory _dataApprove,) = encodeRecover(_token);
+        //(,bytes memory _dataTransfer) = encodeRecover(_token);
+        bytes memory _dataTransfer = encodeRecover(_token);
+        //(bool approveSuccess, ) = _token.call{value: 0}(_dataApprove);
+        //require(approveSuccess, "recoverERC20 approve failed");
         (bool transferSuccess, ) = _token.call{value: 0}(_dataTransfer);
         require(transferSuccess, "recoverERC20 transfer failed");
     }
@@ -195,32 +222,41 @@ contract TrustyAdvanced {
     /**
     * @notice Method used to encode an ERC20 calldata
     */
-    function encodeRecover(address _token) private returns(bytes memory, bytes memory) {
+    function encodeRecover(address _token) private returns(bytes memory) {
         address _recover = recoveryTrusty;
         
         bytes memory balance = abi.encodeWithSignature("balanceOf(address)", address(this));
         (bool success, bytes memory _amount) = _token.call{value: 0}(balance);
         require(success, "Unable to get balance of Token");
 
-        bytes memory approve = abi.encodeWithSignature("approve(address,uint256)", _recover, uint256(bytes32(_amount)));
-        bytes memory transfer = abi.encodeWithSignature("transfer(address,uint256)", _recover, uint256(bytes32(_amount)));
-        return (approve,transfer);
+        bytes memory transfer = abi.encodeWithSignature(
+            "transfer(address,uint256)",
+            _recover,
+            uint256(bytes32(_amount))
+        );
+        //return (approve,transfer);
+        return transfer;
     }
 
     /**
-    * @notice This method is used to submit a transaction proposal that will be seen by the others multisignature's owners
+    * @notice Method used to submit a transaction proposal that will be seen by the others multisignature's owners
     * @param _to Address that will receive the tx or the contract that receive the interaction
     * @param _value Amount of ether to send
     * @param _data Optional data field or calldata to another contract
     * @dev _data can be used as "bytes memory" or "bytes calldata"
     */
-    function submitTransaction(address _to, uint _value, bytes calldata _data, uint _timeLock) public onlyOwner isWhitelisted(_to) notBlacklisted(_to) notLocked {
-        require(block.number <= block.number + _timeLock, "timeLock must be greater than current blockHeight + timeLock");
+    function submitTransaction(address _to, uint _value, bytes calldata _data, uint _timeLock)
+        public
+        onlyOwner
+        isWhitelisted(_to)
+        notBlacklisted(_to)
+        notLocked 
+    {
         this.checkData(_data);
 
-        uint txIndex = transactions.length;
+        //uint txIndex = transactions.length;
 
-        transactions.push(
+        transactions[txIndex] =
             Transaction({
                 to: _to,
                 value: _value,
@@ -229,19 +265,63 @@ contract TrustyAdvanced {
                 numConfirmations: 0,
                 blockHeight: block.number,
                 timestamp: block.timestamp,
-                timeLock: _timeLock
+                timeLock: _timeLock,
+                exists: true,
+                index: txIndex
             })
-        );
+        ;
 
         emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+
+        txIndex++;
+    }
+
+    function submitTransaction(address caller, address _to, uint _value, bytes calldata _data, uint _timeLock)
+        public
+        isWhitelisted(_to)
+        notBlacklisted(_to)
+        notLocked 
+    {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
+        this.checkData(_data);
+
+        //uint txIndex = transactions.length;
+
+        transactions[txIndex] =
+            Transaction({
+                to: _to,
+                value: _value,
+                data: _data,
+                executed: false,
+                numConfirmations: 0,
+                blockHeight: block.number,
+                timestamp: block.timestamp,
+                timeLock: _timeLock,
+                exists: true,
+                index: txIndex
+            })
+        ;
+
+        emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+
+        txIndex++;
     }
 
     /**
-    * @notice Method used to confirm the transaction with index `_txIndex` if it exists, is not executed yet and also not even confirmed from the signer.
+    * @notice Method used to confirm the transaction with index `_txIndex` if exists, not executed and not confirmed.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
-    function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+    function confirmTransaction(uint _txIndex)
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        notConfirmed(_txIndex) 
+    {
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
@@ -249,8 +329,22 @@ contract TrustyAdvanced {
         emit ConfirmTransaction(msg.sender, _txIndex);
     }
 
+    function confirmTransaction(address caller, uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
+        require(!isConfirmed[_txIndex][origin], "tx already confirmed");
+
+        Transaction storage transaction = transactions[_txIndex];
+        transaction.numConfirmations += 1;
+        isConfirmed[_txIndex][origin] = true;
+
+        emit ConfirmTransaction(origin, _txIndex);
+    }
+
     /**
-    * @notice Method used to revoke the confirmation of transaction with index `_txIndex` if it exists and is not executed yet.
+    * @notice Method used to revoke confirmation of transaction with index `_txIndex` if exists and not executed.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
@@ -265,12 +359,34 @@ contract TrustyAdvanced {
         emit RevokeConfirmation(msg.sender, _txIndex);
     }
 
+    function revokeConfirmation(address caller, uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+        
+        Transaction storage transaction = transactions[_txIndex];
+
+        require(isConfirmed[_txIndex][origin], "tx not confirmed");
+
+        transaction.numConfirmations -= 1;
+        isConfirmed[_txIndex][origin] = false;
+
+        emit RevokeConfirmation(origin, _txIndex);
+    }
+
     /**
     * @notice Method used to execute the transaction with index `_txIndex` if it exists and is not executed yet.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
-    function executeTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notLocked {
+    function executeTransaction(uint _txIndex)
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        notLocked
+        nonReentrant()
+    {
         Transaction storage transaction = transactions[_txIndex];
 
         require(!blacklistedToAddresses[transaction.to], "Cannot execute, address/contract is blacklisted!");
@@ -281,24 +397,68 @@ contract TrustyAdvanced {
             "cannot execute tx due to number of confirmation required"
         );
 
+        //require(getBalance() > 0, "no amount");
+
         if (transaction.blockHeight + transaction.timeLock > block.number) {
             int blk = int(transaction.blockHeight + transaction.timeLock - block.number);
             revert TimeLock({err: "timeLock preventing execution: ",blockLeft: blk});
         }
-
-        (bool success, ) = transaction.to.call{value: transaction.value}(
-            transaction.data
-        );
-        require(success, "tx failed");
 
         transaction.executed = true;
 
         transaction.timestamp = block.timestamp;
 
         unlock();
-        
+
+        (bool success, ) = transaction.to.call{value: transaction.value}(
+            transaction.data
+        );
+        require(success, "tx failed");
+
         emit ExecuteTransaction(msg.sender, _txIndex);
-    }    
+    }
+
+    function executeTransaction(address caller, uint _txIndex)
+        public
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        notLocked
+        nonReentrant() 
+    {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+        
+        Transaction storage transaction = transactions[_txIndex];
+
+        require(!blacklistedToAddresses[transaction.to], "Cannot execute, address/contract is blacklisted!");
+        this.checkData(transaction.data);
+        
+        require(
+            transaction.numConfirmations >= numConfirmationsRequired,
+            "cannot execute tx due to number of confirmation required"
+        );
+
+        //require(getBalance() > 0, "no amount");
+
+        if (transaction.blockHeight + transaction.timeLock > block.number) {
+            int blk = int(transaction.blockHeight + transaction.timeLock - block.number);
+            revert TimeLock({err: "timeLock preventing execution: ",blockLeft: blk});
+        }
+
+        transaction.executed = true;
+
+        transaction.timestamp = block.timestamp;
+
+        (bool success, ) = transaction.to.call{value: transaction.value}(
+            transaction.data
+        );
+        require(success, "tx failed");
+
+        unlock();
+        
+        emit ExecuteTransaction(origin, _txIndex);
+    }
 
     /**
     * @notice Method used to execute the transaction with index `_txIndex` if it exists and is not executed yet.
@@ -323,15 +483,27 @@ contract TrustyAdvanced {
     * @return uint Returns the Trusty's total transactions as uint
     */
     function getTransactionCount() public view returns (uint) {
-        return transactions.length;
+        //return transactions.length;
+        return txIndex;
     }
 
     /**
     * @notice Method used to get the transaction proposal structure
     * @param _txIndex The index of the transaction that needs to be retrieved
-    * @custom:return Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
+    * @custom:return Returns Transaction (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight, uint timestamp, uint timeLock) {
+    function getTransaction(uint _txIndex) public view returns(
+        address to,
+        uint value,
+        bytes memory data,
+        bool executed,
+        uint numConfirmations,
+        uint blockHeight,
+        uint timestamp,
+        uint timeLock,
+        bool exists,
+        uint index
+    ) {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
@@ -342,7 +514,9 @@ contract TrustyAdvanced {
             transaction.numConfirmations,
             transaction.blockHeight,
             transaction.timestamp,
-            transaction.timeLock
+            transaction.timeLock,
+            transaction.exists,
+            transaction.index
         );
     }
 
@@ -351,6 +525,14 @@ contract TrustyAdvanced {
     * @custom:owner Can be called by owner
     */
     function getWhitelist() public view onlyOwner returns(address[] memory) {
+        return whitelistedAddressesList;
+    }
+
+    function getWhitelist(address caller) public view returns(address[] memory) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
         return whitelistedAddressesList;
     }
 
@@ -375,12 +557,32 @@ contract TrustyAdvanced {
         return blacklistedAddressesList;
     }
 
+    function getBlacklist(address caller) public view returns(address[] memory) {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
+        return blacklistedAddressesList;
+    }
+
     /**
     * @notice addAddressToBlacklist - This function adds the address to the blacklist
     * @custom:param `address[]` An array of addresses to be removed from blacklist
     * @custom:owner Can be called by owner
     */
     function addAddressToBlacklist(address[] memory addresses) public onlyOwner {
+        for (uint i = 0; i < addresses.length; i++) {
+            require(!blacklistedToAddresses[addresses[i]], "Duplicate address in blacklist");
+            blacklistedToAddresses[addresses[i]] = true;
+            blacklistedAddressesList.push(addresses[i]);
+        }        
+    }
+
+    function addAddressToBlacklist(address caller, address[] memory addresses) public {
+        address origin = getCaller(msg.sender, caller);
+
+        require(isOwner[origin], "not owner");
+
         for (uint i = 0; i < addresses.length; i++) {
             require(!blacklistedToAddresses[addresses[i]], "Duplicate address in blacklist");
             blacklistedToAddresses[addresses[i]] = true;
@@ -414,18 +616,18 @@ contract TrustyAdvanced {
             bytes memory transfer = bytes(abi.encode(bytes(hex"a9059cbb")));
             bytes memory approve = bytes(abi.encode(bytes(hex"095ea7b3")));
             bytes memory transferFrom = bytes(abi.encode(bytes(hex"23b872dd")));
-            bytes memory mint = bytes(abi.encode(bytes(hex"40c10f19")));
+            //bytes memory mint = bytes(abi.encode(bytes(hex"40c10f19")));
             if (
                 keccak256(transfer) == keccak256(selector) || 
                 keccak256(approve) == keccak256(selector) ||
-                keccak256(transferFrom) == keccak256(selector) ||
-                keccak256(mint) == keccak256(selector)
+                keccak256(transferFrom) == keccak256(selector) //||
+                //keccak256(mint) == keccak256(selector)
             ) {
                 bool passed = bool(
                     keccak256(transfer) == keccak256(selector) || 
                     keccak256(approve) == keccak256(selector) || 
-                    keccak256(transferFrom) == keccak256(selector) ||
-                    keccak256(mint) == keccak256(selector)
+                    keccak256(transferFrom) == keccak256(selector) //||
+                    //keccak256(mint) == keccak256(selector)
                 );
                 
                 if (passed) {

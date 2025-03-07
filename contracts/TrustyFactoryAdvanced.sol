@@ -1,10 +1,12 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.28;
+
+//import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "./Trusty.sol";
-import "./TrustySimple.sol";
+//import "./Trusty.sol";
+//import "./TrustySimple.sol";
 import "./TrustyAdvanced.sol";
 
 /**
@@ -17,7 +19,7 @@ import "./TrustyAdvanced.sol";
 contract TrustyFactoryAdvanced is Ownable {
 
     // Trusty indexed array
-    TrustySimple[] public contractsSimple;
+    //TrustySimple[] public contractsSimple;
     TrustyAdvanced[] public contracts;
 
     uint256 public totalTrusty = 0;
@@ -49,43 +51,37 @@ contract TrustyFactoryAdvanced is Ownable {
         whitelistedAddresses[msg.sender] = true;
         numAddressesWhitelisted++;
     }
-    /*
-    function createContract(address[] memory _owners, uint _nTX, string memory _id) payable public notWhitelisted {
-        if(_priceEnabled) {
-            require(msg.value >= _price, "Ether sent is not enough");
-        }
-        TrustySimple trusty = new TrustySimple(_owners, _nTX, _id);
 
-        contractsSimple.push(trusty);
-
-        trustyID[totalTrusty] = _id;
-
-        whitelistedAddresses[address(trusty)] = true;
-        numAddressesWhitelisted++;
-
-        for (uint i = 0; i < _owners.length; i++) {
-            if(!whitelistedAddresses[_owners[i]]) {
-                whitelistedAddresses[_owners[i]] = true;
-                numAddressesWhitelisted++;
-            }            
-        }
-
-        trustyOwner[totalTrusty] = _owners;
-
-        totalTrusty++;
-    }
-    */
     /**
     * @notice This method is used to create a Trusty multisignature
     * @param _owners Array of owners' addresses
     * @param _nTX Minimum number of confirmations required to execute a transaction
     */
-    function createContract(address[] memory _owners, uint _nTX, string memory _id, address[] memory _whitelist, address _recovery, uint _blocklock) payable public notWhitelisted {
+    function createContract(
+        address[] memory _owners,
+        uint _nTX,
+        string memory _id,
+        address[] memory _whitelist,
+        address _recovery,
+        uint _blocklock
+    ) payable public notWhitelisted {
         if(_priceEnabled) {
             require(msg.value >= _price, "Ether sent is not enough");
         }
         TrustyAdvanced trusty = new TrustyAdvanced(_owners, _nTX, _id, _whitelist, _recovery, _blocklock);
         //TrustySimple trusty = new TrustySimple(_owners, _nTX, _id);
+
+        /*
+        if (_mode) {
+            TrustySimple trusty = new TrustySimple(_owners, _nTX, _id);
+            contractsSimple.push(trusty);
+            whitelistedAddresses[address(trusty)] = true;
+        } else {
+            TrustyAdvanced trusty = new TrustyAdvanced(_owners, _nTX, _id, _whitelist, _recovery, _blocklock);
+            contracts.push(trusty);
+            whitelistedAddresses[address(trusty)] = true;
+        }
+        */
         
         contracts.push(trusty);
 
@@ -155,24 +151,50 @@ contract TrustyFactoryAdvanced is Ownable {
     }
 
     /**
-    * @notice This method is used to retrieve the transaction data structure specified by its contract and transaction index
+    * @notice Method used to retrieve transaction data structure specified by its contract and transaction index
     * @param _contractIndex The Trusty contract index that will be called
     * @param _txIndex The transaction index of the contract's index specified
-    * @custom:return bool Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
+    * @custom:return bool Returns Transaction (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTx(uint256 _contractIndex, uint _txIndex) public view returns(address, uint, bytes memory, bool, uint, uint, uint, uint) {
+    function getTx(uint256 _contractIndex, uint _txIndex) public view returns(
+        address,
+        uint,
+        bytes memory,
+        bool,
+        uint,
+        uint,
+        uint,
+        uint,
+        bool,
+        uint
+    ) {
         return contracts[_contractIndex].getTransaction(_txIndex);
     }
     
     /**
-    * @notice This method is used to submit a proposal of a transaction whose details are specified by method's parameters
+    * @notice Method used to submit a proposal of a transaction whose details are specified by method's parameters
     * @param _contractIndex The Trusty contract index that will be used to submit the transaction proposal
     * @param _to The receiver address of the proposed transaction or the contract's address to interact with
     * @param _value The amount value of the proposed transaction
     * @param _data The data parameter can contains ordinary data or an encoded call to interact with another contract
     */
-    function trustySubmit(uint256 _contractIndex, address _to, uint256 _value, bytes memory _data, uint _timeLock) public notWhitelisted {
-        contracts[_contractIndex].submitTransaction(_to, _value, _data, _timeLock);
+    function trustySubmit(
+        uint256 _contractIndex,
+        address _to,
+        uint256 _value,
+        bytes memory _data,
+        uint _timeLock
+    ) public notWhitelisted {
+        bool found = false;
+        for (uint i = 0; i < trustyOwner[_contractIndex].length; i++) {
+            if (msg.sender == trustyOwner[_contractIndex][i]) {
+                found = true;
+                break;
+            }
+        }
+        require(found, "msg.sender not owner");
+        //contracts[_contractIndex].submitTransaction(_to, _value, _data, _timeLock);
+        contracts[_contractIndex].submitTransaction(msg.sender, _to, _value, _data, _timeLock);
     }
     
     /**
@@ -181,7 +203,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     */
     function trustyConfirm(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
-        contracts[_contractIndex].confirmTransaction(_txIndex);
+        contracts[_contractIndex].confirmTransaction(msg.sender, _txIndex);
     }
 
     /**
@@ -190,7 +212,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     */
     function trustyExecute(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
-        contracts[_contractIndex].executeTransaction(_txIndex);
+        contracts[_contractIndex].executeTransaction(msg.sender, _txIndex);
     }
 
     /**
@@ -199,7 +221,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @param _txIndex The transaction index of the contract's index specified
     */
     function trustyRevoke(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
-        contracts[_contractIndex].revokeConfirmation(_txIndex);
+        contracts[_contractIndex].revokeConfirmation(msg.sender, _txIndex);
     }
 
     /**
@@ -208,7 +230,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @return address[] Returns an array of whitelisted addresses
     */
     function getTrustyWhitelist(uint256 _contractIndex) public view returns(address[] memory) {
-        return contracts[_contractIndex].getWhitelist();
+        return contracts[_contractIndex].getWhitelist(msg.sender);
     }
 
     /**
@@ -217,7 +239,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @return address[] Returns an array of whitelisted addresses
     */
     function getTrustyBlacklist(uint256 _contractIndex) public view returns(address[] memory) {
-        return contracts[_contractIndex].getBlacklist();
+        return contracts[_contractIndex].getBlacklist(msg.sender);
     }
 
     /**
@@ -226,7 +248,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @param addresses An array of addresses to be blacklisted
     */
     function addToTrustyBlacklist(uint256 _contractIndex, address[] memory addresses) public notWhitelisted {
-        return contracts[_contractIndex].addAddressToBlacklist(addresses);
+        return contracts[_contractIndex].addAddressToBlacklist(msg.sender, addresses);
     }
 
     /**
@@ -253,7 +275,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @custom:owner Can be called by Factory owner
     */
     function setMaxWhitelist(uint8 _maxWhitelistedAddresses) public onlyOwner {
-        maxWhitelistedAddresses =  _maxWhitelistedAddresses;
+        maxWhitelistedAddresses =  _maxWhitelistedAddresses; // TODO:
     }
 
     /**

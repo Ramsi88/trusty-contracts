@@ -1,17 +1,20 @@
 require("@nomicfoundation/hardhat-toolbox");
 require("@nomicfoundation/hardhat-ledger");
 require("dotenv").config({ path: ".env" });
+require("@nomiclabs/hardhat-solhint");
 
 const prompt = require('prompt-sync')();
 
 let input = false
 if(
-  process.argv.length === 2 && process.argv[1].includes("scripts/deploy.js") || 
-  process.argv[1].includes("scripts/deploySimple.js") || 
+  process.argv.length === 2 &&
+  process.argv[1].includes("scripts/deploy.js") ||
+  process.argv[1].includes("scripts/deployFactory.js") ||
+  process.argv[1].includes("scripts/deployFactoryAdvanced.js") ||
   process.argv[1].includes("scripts/deployRecovery.js") ||
   process.argv[1].includes("scripts/deployAdvanced.js")
   ){
-  input = prompt('Would you like to use HW Ledger? [y] or [press any button] to skip: ')==="y"?true:false;
+  input = prompt('Would you like to use HW Ledger? [y] or [press any button] to skip: ') === "y" ? true : false;
 }
 
 const {INFURA_API_KEY, COINMARKETCAP_API_KEY, ETHERSCAN_API_KEY, QUICKNODE_HTTP_URL, PRIVATE_KEY, LEDGER_ADDRESS, MNEMONIC, PASSPHRASE} = process.env;
@@ -60,7 +63,7 @@ if(useLedger) {
   module.exports = {
     defaultNetwork: "hardhat",
     solidity: {
-      version:"0.8.25",
+      version:"0.8.28",
       settings: {
         optimizer: {
           enabled: true,
@@ -73,7 +76,7 @@ if(useLedger) {
       //gasPrice: gasPrice,
       //outputFile: "gas-report/gas-report.txt",
       noColors: false,
-      currency: "EUR",
+      currency: "USD",
       coinmarketcap: COINMARKETCAP_API_KEY,
       //gasPriceApi: ETHERSCAN_API_KEY,
       token: "ETH"
@@ -140,7 +143,7 @@ if(useLedger) {
   module.exports = {
     defaultNetwork: "hardhat",
     solidity: {
-      version:"0.8.25",
+      version:"0.8.28",
       settings: {
         optimizer: {
           enabled: true,
@@ -153,7 +156,7 @@ if(useLedger) {
       //gasPrice: gasPrice,
       //outputFile: "gas-report/gas-report.txt",
       noColors: false,
-      currency: "EUR",
+      currency: "USD",
       coinmarketcap: COINMARKETCAP_API_KEY,
       //gasPriceApi: ETHERSCAN_API_KEY,
       token: "ETH"

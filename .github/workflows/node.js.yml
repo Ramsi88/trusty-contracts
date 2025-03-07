@@ -5,7 +5,7 @@ name: Node.js CI
 
 on:
   push:
-    branches: [ "main", "dev", "cksg" ]
+    branches: [ "main", "dev", "v2" ]
   pull_request:
     branches: [ "main" ]
 
@@ -29,6 +29,8 @@ jobs:
     #- run: npm i
     - run: npm ci
     - run: npm run compile
+    - run: npm run solhint
+    - run: npm run coverage
     - run: npm run test
     #- run: npm run build --if-present
     #- run: npm test

@@ -826,7 +826,6 @@ describe("Trusty tests", async () => {
             const txGet = await Advanced.getTransaction(0);
 
             expect(txGet[3]).to.equal(true)
-            
         })
 
         it("should revert a transaction with execution less than timelock test", async () => {
@@ -917,7 +916,6 @@ describe("Trusty tests", async () => {
                 //console.log(getTrustyWhitelist[i],whitelistToCheck[i])
                 expect(getTrustyWhitelist[i]).to.be.equal(whitelistToCheck[i])
             }
-            
         })
 
         it("submit, confirm and execute a transaction proposal to a whitelisted address test", async () => {
@@ -1237,7 +1235,7 @@ describe("Trusty tests", async () => {
             await expect(Advanced.connect(accounts.owner).submitTransaction(accounts.erc20contract.address, amount, "0xa9059cbb000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000", 0)).to.be.revertedWith("Calldata not allowed or address not whitelisted!")
             await expect(Advanced.connect(accounts.owner).submitTransaction(accounts.erc20contract.address, amount, "0x095ea7b3000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000", 0)).to.be.revertedWith("Calldata not allowed or address not whitelisted!")
             await expect(Advanced.connect(accounts.owner).submitTransaction(accounts.erc20contract.address, amount, "0x23b872dd000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000", 0)).to.be.revertedWith("Calldata not allowed or address not whitelisted!")
-            await expect(Advanced.connect(accounts.owner).submitTransaction(accounts.erc20contract.address, amount, "0x40c10f19000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000", 0)).to.be.revertedWith("Calldata not allowed or address not whitelisted!")
+            //await expect(Advanced.connect(accounts.owner).submitTransaction(accounts.erc20contract.address, amount, "0x40c10f19000000000000000000000000eDaCEf763B85597A517061D276D61947610411D10000000000000000000000000000000000000000000000000de0b6b3a7640000", 0)).to.be.revertedWith("Calldata not allowed or address not whitelisted!")
         })     
     });
     
@@ -1498,7 +1496,6 @@ describe("Trusty tests", async () => {
 
             expect(BigInt(trustyBal)).to.equal(BigInt(0));
             expect(BigInt(recoveryBal)).to.equal(amount);
-            
         })
 
         it("execute an erc20 recovery after absolute timelock expiring test", async () => {

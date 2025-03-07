@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title Trusty Recovery Multisignature
@@ -9,7 +11,7 @@ pragma solidity ^0.8.25;
  * @dev All function calls are meant to be called from the Factory, but the contract can also be deployed alone
  * Copyright (c) 2024 Ramzi Bougammoura
  */
-contract Recovery {
+contract Recovery is ReentrancyGuard {
     string public id;
 
     //Events
@@ -40,12 +42,17 @@ contract Recovery {
         uint numConfirmations;     
         uint blockHeight;
         uint timestamp;
+        bool exists;
+        uint index;
     }
+
+    uint txIndex = 0;
 
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    Transaction[] public transactions;
+    //Transaction[] public transactions;
+    mapping(uint => Transaction) public transactions;
 
     // whitelist
     mapping(address => bool) public whitelistedToAddresses;
@@ -71,7 +78,8 @@ contract Recovery {
     }
 
     modifier txExists(uint _txIndex) {
-        require(_txIndex < transactions.length, "tx does not exist");
+        //require(_txIndex < transactions.length, "tx does not exist");
+        require(transactions[_txIndex].exists, "tx does not exist");
         _;
     }
 
@@ -120,16 +128,20 @@ contract Recovery {
     }
 
     /**
-    * @notice This method is used to submit a transaction proposal that will be seen by the others multisignature's owners
+    * @notice Method used to submit a transaction proposal that will be seen by the others multisignature's owners
     * @param _to Address that will receive the tx or the contract that receive the interaction
     * @param _value Amount of ether to send
     * @param _data Optional data field or calldata to another contract
     * @dev _data can be used as "bytes memory" or "bytes calldata"
     */
-    function submitTransaction(address _to, uint _value, bytes calldata _data) public onlyOwner isWhitelisted(_to) notBlacklisted(_to) {
-        uint txIndex = transactions.length;
+    function submitTransaction(
+        address _to,
+        uint _value,
+        bytes calldata _data
+    ) public onlyOwner isWhitelisted(_to) notBlacklisted(_to) {
+        //uint txIndex = transactions.length;
 
-        transactions.push(
+        transactions[txIndex] =
             Transaction({
                 to: _to,
                 value: _value,
@@ -137,19 +149,29 @@ contract Recovery {
                 executed: false,
                 numConfirmations: 0,
                 blockHeight: block.number,
-                timestamp: block.timestamp
+                timestamp: block.timestamp,
+                exists: true,
+                index: txIndex
             })
-        );
+        ;
 
         emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+
+        txIndex++;
     }
 
     /**
-    * @notice Method used to confirm the transaction with index `_txIndex` if it exists, is not executed yet and also not even confirmed from the signer.
+    * @notice Method used to confirm transaction with index `_txIndex` if exists, not executed and not confirmed.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
-    function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+    function confirmTransaction(uint _txIndex) 
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        notConfirmed(_txIndex)
+    {
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
@@ -158,7 +180,7 @@ contract Recovery {
     }
 
     /**
-    * @notice Method used to revoke the confirmation of transaction with index `_txIndex` if it exists and is not executed yet.
+    * @notice Method used to revoke confirmation of transaction with index `_txIndex` if exists and not executed.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
@@ -178,7 +200,13 @@ contract Recovery {
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
-    function executeTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    function executeTransaction(uint _txIndex)
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        nonReentrant() 
+    {
         Transaction storage transaction = transactions[_txIndex];
 
         require(!blacklistedToAddresses[transaction.to], "Cannot execute, address/contract is blacklisted!");
@@ -187,6 +215,8 @@ contract Recovery {
             transaction.numConfirmations >= numConfirmationsRequired,
             "cannot execute tx due to number of confirmation required"
         );
+
+        //require(getBalance() > 0, "no amount");
 
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
@@ -223,15 +253,26 @@ contract Recovery {
     * @return uint Returns the Trusty's total transactions as uint
     */
     function getTransactionCount() public view returns (uint) {
-        return transactions.length;
+        //return transactions.length;
+        return txIndex;
     }
 
     /**
     * @notice Method used to get the transaction proposal structure
     * @param _txIndex The index of the transaction that needs to be retrieved
-    * @custom:return Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
+    * @custom:return Returns a Transaction (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight, uint timestamp) {
+    function getTransaction(uint _txIndex) public view returns(
+        address to,
+        uint value,
+        bytes memory data,
+        bool executed,
+        uint numConfirmations,
+        uint blockHeight,
+        uint timestamp,
+        bool exists,
+        uint index
+    ) {
         Transaction storage transaction = transactions[_txIndex];
 
         return (
@@ -241,7 +282,9 @@ contract Recovery {
             transaction.executed,
             transaction.numConfirmations,
             transaction.blockHeight,
-            transaction.timestamp
+            transaction.timestamp,
+            transaction.exists,
+            transaction.index
         );
     }
 
@@ -257,7 +300,7 @@ contract Recovery {
     * @notice addAddressToWhitelist - This function adds the address of the sender to the whitelist
     * @custom:param `address[]` An array of addresses to be whitelisted
     * @custom:owner Can be called by owner
-    */
+    
     function addAddressToWhitelist(address[] memory addresses) private {
         for (uint i = 0; i < addresses.length; i++) {
             require(!whitelistedToAddresses[addresses[i]], "Each address must be unique to be in whitelist");
@@ -265,15 +308,17 @@ contract Recovery {
             whitelistedAddressesList.push(addresses[i]);
         }        
     }
+    */
 
     /**
     * @notice addAddressToRecoverWhitelist - This function adds the address of the sender to the whitelist
     * @custom:param `address[]` An array of addresses to be whitelisted
     * @custom:owner Can be called by owner
     */
-    function addAddressToRecoveryWhitelist(address[] memory addresses) public onlyOwner {        
+    function addAddressToRecoveryWhitelist(address[] memory addresses) public onlyOwner {
         for (uint i = 0; i < addresses.length; i++) {
             // Add the address which called the function to the whitelistedAddress array
+            require(!whitelistedToAddresses[addresses[i]], "Each address must be unique to be in whitelist");
             whitelistedToAddresses[addresses[i]] = true;
             whitelistedAddressesList.push(addresses[i]);
         }        
@@ -294,7 +339,7 @@ contract Recovery {
     */
     function addAddressToBlacklist(address[] memory addresses) public onlyOwner {
         for (uint i = 0; i < addresses.length; i++) {
-            require(!blacklistedToAddresses[addresses[i]], "Duplicate address in blacklist");
+            require(!blacklistedToAddresses[addresses[i]], "Duplicated address in blacklist");
             blacklistedToAddresses[addresses[i]] = true;
             blacklistedAddressesList.push(addresses[i]);
         }        

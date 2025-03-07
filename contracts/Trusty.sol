@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 
-pragma solidity ^0.8.25;
+pragma solidity ^0.8.28;
+
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 /**
  * @title Trusty Multisignature
@@ -9,7 +11,7 @@ pragma solidity ^0.8.25;
  * @dev All function calls are meant to be called from the Factory, but the contract can also be deployed alone
  * Copyright (c) 2024 Ramzi Bougammoura
  */
-contract Trusty {
+contract Trusty is ReentrancyGuard {
     string public id;
 
     //Events
@@ -41,12 +43,17 @@ contract Trusty {
         uint numConfirmations;     
         uint blockHeight;
         uint timestamp;
+        bool exists;
+        uint index;
     }
+
+    uint txIndex = 0;
 
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    Transaction[] public transactions;
+    //Transaction[] public transactions;
+    mapping(uint => Transaction) public transactions;
 
     modifier onlyOwner() {
         require(isOwner[msg.sender], "not owner");
@@ -54,7 +61,8 @@ contract Trusty {
     }
 
     modifier txExists(uint _txIndex) {
-        require(_txIndex < transactions.length, "tx does not exist");
+        //require(_txIndex < transactions.length, "tx does not exist");
+        require(transactions[_txIndex].exists, "tx does not exist");
         _;
     }
 
@@ -110,7 +118,7 @@ contract Trusty {
     }
 
     /**
-    * @notice This method is used to submit a transaction proposal that will be seen by the others multisignature's owners
+    * @notice Method used to submit a transaction proposal that will be seen by the others multisignature's owners
     * @param _to Address that will receive the tx or the contract that receive the interaction
     * @param _value Amount of ether to send
     * @param _data Optional data field or calldata to another contract
@@ -118,9 +126,9 @@ contract Trusty {
     */
     function submitTransaction(address _to, uint _value, bytes calldata _data) public onlyOwner {
         
-        uint txIndex = transactions.length;
+        //uint txIndex = transactions.length;
 
-        transactions.push(
+        transactions[txIndex] =
             Transaction({
                 to: _to,
                 value: _value,
@@ -128,11 +136,15 @@ contract Trusty {
                 executed: false,
                 numConfirmations: 0,
                 blockHeight: block.number,
-                timestamp: block.timestamp
+                timestamp: block.timestamp,
+                exists: true,
+                index: txIndex
             })
-        );
+        ;
 
         emit SubmitTransaction(msg.sender, txIndex, _to, _value, _data);
+
+        txIndex++;
     }
 
     function submitTransaction(address caller, address _to, uint _value, bytes calldata _data) public /* onlyOwner */ {
@@ -140,9 +152,9 @@ contract Trusty {
 
         require(isOwner[origin], "not owner");
         
-        uint txIndex = transactions.length;
+        //uint txIndex = transactions.length;
 
-        transactions.push(
+        transactions[txIndex] =
             Transaction({
                 to: _to,
                 value: _value,
@@ -150,19 +162,29 @@ contract Trusty {
                 executed: false,
                 numConfirmations: 0,
                 blockHeight: block.number,
-                timestamp: block.timestamp
+                timestamp: block.timestamp,
+                exists: true,
+                index: txIndex
             })
-        );
+        ;
 
         emit SubmitTransaction(origin, txIndex, _to, _value, _data);
+
+        txIndex++;
     }
 
     /**
-    * @notice Method used to confirm the transaction with index `_txIndex` if it exists, is not executed yet and also not even confirmed from the signer.
+    * @notice Method used to confirm the transaction with index `_txIndex` if exists, not executed and not confirmed.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
-    function confirmTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) notConfirmed(_txIndex) {
+    function confirmTransaction(uint _txIndex) 
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        notConfirmed(_txIndex) 
+    {
         Transaction storage transaction = transactions[_txIndex];
         transaction.numConfirmations += 1;
         isConfirmed[_txIndex][msg.sender] = true;
@@ -185,7 +207,7 @@ contract Trusty {
     }
 
     /**
-    * @notice Method used to revoke the confirmation of transaction with index `_txIndex` if it exists and is not executed yet.
+    * @notice Method used to revoke confirmation of transaction with index `_txIndex` if exists and not executed.
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
@@ -220,13 +242,21 @@ contract Trusty {
     * It can only be called by the contract's owners
     * @param _txIndex The index of the transaction that needs to be signed and confirmed
     */
-    function executeTransaction(uint _txIndex) public onlyOwner txExists(_txIndex) notExecuted(_txIndex) {
+    function executeTransaction(uint _txIndex)
+        public
+        onlyOwner
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        nonReentrant() 
+    {
         Transaction storage transaction = transactions[_txIndex];
         
         require(
             transaction.numConfirmations >= numConfirmationsRequired,
             "cannot execute tx due to number of confirmation required"
         );
+
+        //require(getBalance() > 0, "no amount");
 
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
@@ -241,7 +271,12 @@ contract Trusty {
         emit ExecuteTransaction(msg.sender, _txIndex);
     }
 
-    function executeTransaction(address caller, uint _txIndex) public txExists(_txIndex) notExecuted(_txIndex) {
+    function executeTransaction(address caller, uint _txIndex)
+        public
+        txExists(_txIndex)
+        notExecuted(_txIndex)
+        nonReentrant() 
+    {
         address origin = getCaller(msg.sender, caller);
 
         require(isOwner[origin], "not owner");
@@ -253,15 +288,17 @@ contract Trusty {
             "cannot execute tx due to number of confirmation required"
         );
 
+        //require(getBalance() > 0, "no amount");
+
+        transaction.executed = true;
+        
+        transaction.timestamp = block.timestamp;
+
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
         );
         
         require(success, "tx failed");
-
-        transaction.executed = true;
-        
-        transaction.timestamp = block.timestamp;
         
         emit ExecuteTransaction(origin, _txIndex);
     }
@@ -289,15 +326,24 @@ contract Trusty {
     * @return uint Returns the Trusty's total transactions as uint
     */
     function getTransactionCount() public view returns (uint) {
-        return transactions.length;
+        //return transactions.length;
+        return txIndex;
     }
 
     /**
     * @notice Method used to get the transaction proposal structure
     * @param _txIndex The index of the transaction that needs to be retrieved
-    * @custom:return Returns a Transaction structure as (address to, uint value, bytes data, bool executed, uint numConfirmations)
+    * @custom:return Returns Transaction (address to, uint value, bytes data, bool executed, uint numConfirmations)
     */
-    function getTransaction(uint _txIndex) public view returns(address to, uint value, bytes memory data, bool executed, uint numConfirmations, uint blockHeight, uint timestamp) {
+    function getTransaction(uint _txIndex) public view returns(
+        address to,
+        uint value,
+        bytes memory data,
+        bool executed,
+        uint numConfirmations,
+        uint blockHeight,
+        uint timestamp
+    ) {
         Transaction storage transaction = transactions[_txIndex];
 
         return (

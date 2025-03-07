@@ -7,9 +7,10 @@
     "compile": "npx hardhat compile",
     "start": "npx hardhat run scripts/run.js",
     "deploy": "npx hardhat run scripts/deploy.js --network",
-    "deploy-simple": "npx hardhat run scripts/deploySimple.js --network",
     "deploy-advanced": "npx hardhat run scripts/deployAdvanced.js --network",
     "deploy-recovery": "npx hardhat run scripts/deployRecovery.js --network",
+    "deploy-factory": "npx hardhat run scripts/deploy.js --network",
+    "deploy-factory-advanced": "npx hardhat run scripts/deploy.js --network",
     "verify": "npx hardhat verify --network",
     "test": "hardhat test",
     "test-id": "hardhat test --grep",
@@ -28,7 +29,8 @@
     "@nomicfoundation/hardhat-toolbox": "^5.0.0",
     "@nomiclabs/hardhat-solhint": "^4.0.1",
     "ethers": "^6.13.4",
-    "hardhat": "^2.22.17"
+    "hardhat": "^2.22.17",
+    "keccak": "^3.0.4"
   },
   "dependencies": {
     "@openzeppelin/contracts": "^4.9.6",

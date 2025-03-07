@@ -28,6 +28,7 @@ pragma solidity >=0.7.0 <0.9.0;
     }
 
     function transfer(address to, uint value) public returns(bool) {
+        require(value > 0, "Can not transfer negative value");
         require(balanceOf(msg.sender) >= value, 'Balance too low');
         balances[to] += value;
         balances[msg.sender] -= value;
@@ -35,6 +36,7 @@ pragma solidity >=0.7.0 <0.9.0;
         return true;
     }
 
+    /*
     function transferFrom(address from, address to, uint value) public returns(bool) {
         require(balanceOf(from) >= value, 'Balance too low');
         require(allowance[from][msg.sender] >= value, 'allowance too low');
@@ -43,6 +45,7 @@ pragma solidity >=0.7.0 <0.9.0;
         emit Transfer(from, to, value);
         return true;
     }
+    */
 
     function approve(address spender, uint value) public returns(bool) {
         allowance[msg.sender][spender] = value;
