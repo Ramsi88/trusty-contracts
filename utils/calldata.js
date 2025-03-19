@@ -59,10 +59,10 @@ function decodeCalldata(data) {
                 //console.log(`[UTF8]: ${Buffer.from(data).toString("utf8")} | [ASCII]: ${Buffer.from(data).toString("ascii")}`)
                 decodedString = `transfer(address,uint256) | address: ${toChecksumAddress(address)} | amount: ${amount}`
                 break
-            case "5c470ecb":
-                //console.log("[Decoded CALLDATA]:*** POR() ***")
+            case "a69df4b5":
+                //console.log("[Decoded CALLDATA]:*** unlock() ***")
                 //console.log(`[UTF8]: ${Buffer.from(data).toString("utf8")} | [ASCII]: ${Buffer.from(data).toString("ascii")}`)
-                decodedString = `POR()`
+                decodedString = `unlock()`
                 break
             case "ce746024":
                 //console.log("[Decoded CALLDATA]:*** recover() ***")

@@ -2,11 +2,10 @@
 
 pragma solidity ^0.8.28;
 
-//import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
-//import "./Trusty.sol";
-//import "./TrustySimple.sol";
+
 import "./TrustyAdvanced.sol";
 
 /**
@@ -16,10 +15,9 @@ import "./TrustyAdvanced.sol";
  * @dev Most function calls are meant to be proxied from the Factory to the Trusty owned
  * Copyright (c) 2024 Ramzi Bougammoura
  */
-contract TrustyFactoryAdvanced is Ownable {
+contract TrustyFactoryAdvanced is Ownable, ReentrancyGuard {
 
     // Trusty indexed array
-    //TrustySimple[] public contractsSimple;
     TrustyAdvanced[] public contracts;
 
     uint256 public totalTrusty = 0;
@@ -69,19 +67,6 @@ contract TrustyFactoryAdvanced is Ownable {
             require(msg.value >= _price, "Ether sent is not enough");
         }
         TrustyAdvanced trusty = new TrustyAdvanced(_owners, _nTX, _id, _whitelist, _recovery, _blocklock);
-        //TrustySimple trusty = new TrustySimple(_owners, _nTX, _id);
-
-        /*
-        if (_mode) {
-            TrustySimple trusty = new TrustySimple(_owners, _nTX, _id);
-            contractsSimple.push(trusty);
-            whitelistedAddresses[address(trusty)] = true;
-        } else {
-            TrustyAdvanced trusty = new TrustyAdvanced(_owners, _nTX, _id, _whitelist, _recovery, _blocklock);
-            contracts.push(trusty);
-            whitelistedAddresses[address(trusty)] = true;
-        }
-        */
         
         contracts.push(trusty);
 
@@ -193,7 +178,6 @@ contract TrustyFactoryAdvanced is Ownable {
             }
         }
         require(found, "msg.sender not owner");
-        //contracts[_contractIndex].submitTransaction(_to, _value, _data, _timeLock);
         contracts[_contractIndex].submitTransaction(msg.sender, _to, _value, _data, _timeLock);
     }
     
@@ -211,7 +195,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @param _contractIndex The Trusty contract index that will be called
     * @param _txIndex The transaction index of the contract's index specified
     */
-    function trustyExecute(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
+    function trustyExecute(uint256 _contractIndex, uint _txIndex) public notWhitelisted nonReentrant {
         contracts[_contractIndex].executeTransaction(msg.sender, _txIndex);
     }
 
@@ -255,7 +239,7 @@ contract TrustyFactoryAdvanced is Ownable {
     * @notice This method is used to be whitelisted by Factory to the services
     * @custom:payable Require `_price`
     */
-    function whitelistMe() public payable {
+    function whitelistMe() public payable nonReentrant {
         // check if the numAddressesWhitelisted < maxWhitelistedAddresses, if not then throw an error.
         require(numAddressesWhitelisted < maxWhitelistedAddresses, "Whitelist limit reached");
         require(!whitelistedAddresses[msg.sender],"You are already whitelisted");
@@ -266,7 +250,6 @@ contract TrustyFactoryAdvanced is Ownable {
         
         // Increase the number of whitelisted addresses
         numAddressesWhitelisted += 1;
-        //return contracts[_contractIndex].removeAddressFromWhitelist(addresses);
     }
 
     /**
@@ -284,8 +267,8 @@ contract TrustyFactoryAdvanced is Ownable {
     * @custom:owner Can be called by Factory owner
     */
     function addToFactoryWhitelist(address[] memory addresses) public onlyOwner {
-        // check if the numAddressesWhitelisted < maxWhitelistedAddresses, if not then throw an error.
-        require(numAddressesWhitelisted < maxWhitelistedAddresses, "Whitelist limit reached");
+        // check if numAddressesWhitelisted + addresses.length < maxWhitelistedAddresses, if not then throw an error.
+        require(numAddressesWhitelisted + addresses.length < maxWhitelistedAddresses, "Whitelist limit reached");
         
         for (uint i = 0; i < addresses.length; i++) {
             // Add the address which called the function to the whitelistedAddress array

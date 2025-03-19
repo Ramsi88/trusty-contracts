@@ -372,7 +372,7 @@ describe("TRUSTY multisig tests", async () => {
                 await expect(Advanced.connect(accounts.owner).submitTransaction(accounts.otherAccount.address, 1, "0xce746024", 0)).to.be.revertedWith("Address is blacklisted!");
 
                 // Shoul fail PoR if not locked
-                await expect(Advanced.connect(accounts.anonymous).POR()).to.be.revertedWith("Trusty not yet unlocked!")
+                await expect(Advanced.connect(accounts.anonymous).unlock()).to.be.revertedWith("Trusty not yet unlocked!")
 
                 await mine(BLOCKLOCK + 120).then(async () => {
                     // Should fail submitting transaction if locked
@@ -380,9 +380,9 @@ describe("TRUSTY multisig tests", async () => {
                 })
 
                 // Shoul fail PoR from not recovery
-                await expect(Advanced.connect(accounts.owner).POR()).to.be.revertedWith("Not allowed!")
+                await expect(Advanced.connect(accounts.owner).unlock()).to.be.revertedWith("Not allowed!")
 
-                await Advanced.connect(accounts.anonymous).POR()
+                await Advanced.connect(accounts.anonymous).unlock()
 
                 const submitTx = await Advanced.connect(accounts.owner).submitTransaction(trustyAddr, 1, Buffer.from("test"), 100)
                 await submitTx.wait()
@@ -439,7 +439,7 @@ describe("TRUSTY multisig tests", async () => {
                     // Should fail if absolute timelock has passed
                     await expect(Advanced.connect(accounts.other).executeTransaction(0)).to.be.revertedWith("Trusty is locked!")
 
-                    await Advanced.connect(accounts.anonymous).POR()
+                    await Advanced.connect(accounts.anonymous).unlock()
 
                     const executeTx = await Advanced.connect(accounts.other).executeTransaction(0)
                     await executeTx.wait()

@@ -2,7 +2,7 @@
 
 pragma solidity ^0.8.28;
 
-//import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
+import "@openzeppelin/contracts/security/ReentrancyGuard.sol";
 
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "./Trusty.sol";
@@ -14,7 +14,7 @@ import "./Trusty.sol";
  * @dev Most function calls are meant to be proxied from the Factory to the Trusty owned
  * Copyright (c) 2024 Ramzi Bougammoura
  */
-contract TrustyFactory is Ownable {
+contract TrustyFactory is Ownable, ReentrancyGuard {
 
     //mapping(address => bool) public isOwner;
 
@@ -38,15 +38,8 @@ contract TrustyFactory is Ownable {
     // Map owners address array to Trusty index
     mapping(uint256 => address[]) public trustyOwner;
 
-    /*
-    modifier onlyOwner() {
-        require(isOwner[msg.sender], "not owner");
-        _;
-    }
-    */
-
     modifier notWhitelisted {
-        require(whitelistedAddresses[msg.sender], "Not in the Factory Whitelist!"); // TODO: Contract to contract call
+        require(whitelistedAddresses[msg.sender], "Not in the Factory Whitelist!");
         _;
     }
 
@@ -68,7 +61,7 @@ contract TrustyFactory is Ownable {
             require(msg.value >= _price, "Ether sent is not enough");
         }
 
-        Trusty trusty = new Trusty(_owners, _nTX, _id/* , _whitelist, _recovery, _blocklock */);
+        Trusty trusty = new Trusty(_owners, _nTX, _id);
         contracts.push(trusty);
 
         trustyID[totalTrusty] = _id;
@@ -76,10 +69,13 @@ contract TrustyFactory is Ownable {
         whitelistedAddresses[address(trusty)] = true;
         numAddressesWhitelisted++;
 
+        require(numAddressesWhitelisted < maxWhitelistedAddresses, "Whitelist limit reached");
+
         for (uint i = 0; i < _owners.length; i++) {
             if(!whitelistedAddresses[_owners[i]]) {
                 whitelistedAddresses[_owners[i]] = true;
                 numAddressesWhitelisted++;
+                require(numAddressesWhitelisted < maxWhitelistedAddresses, "Whitelist limit reached");
             }            
         }
 
@@ -104,7 +100,6 @@ contract TrustyFactory is Ownable {
     * @return address[] Returns the Trusty's owners' addresses array
     */
     function contractReadOwners(uint256 _contractIndex) public view returns(address[] memory) {
-        //Trusty trusty = Trusty(Trusty[_contractIndex]);
         return contracts[_contractIndex].getOwners();
     }
 
@@ -114,7 +109,6 @@ contract TrustyFactory is Ownable {
     * @return uint256 Returns the Trusty's balance
     */
     function contractReadBalance(uint256 _contractIndex) public view returns(uint256) {
-        //Trusty trusty = Trusty(Trusty[_contractIndex]);
         return contracts[_contractIndex].getBalance();
     }
 
@@ -175,7 +169,6 @@ contract TrustyFactory is Ownable {
             }
         }
         require(found, "msg.sender not owner");
-        //contracts[_contractIndex].submitTransaction(_to, _value, _data);
         contracts[_contractIndex].submitTransaction(msg.sender, _to, _value, _data);
     }
     
@@ -193,7 +186,7 @@ contract TrustyFactory is Ownable {
     * @param _contractIndex The Trusty contract index that will be called
     * @param _txIndex The transaction index of the contract's index specified
     */
-    function trustyExecute(uint256 _contractIndex, uint _txIndex) public notWhitelisted {
+    function trustyExecute(uint256 _contractIndex, uint _txIndex) public notWhitelisted nonReentrant {
         contracts[_contractIndex].executeTransaction(msg.sender, _txIndex);
     }
 
@@ -210,7 +203,7 @@ contract TrustyFactory is Ownable {
     * @notice This method is used to be whitelisted by Factory to the services
     * @custom:payable Require `_price`
     */
-    function whitelistMe() public payable {
+    function whitelistMe() public payable nonReentrant {
         // check if the numAddressesWhitelisted < maxWhitelistedAddresses, if not then throw an error.
         require(numAddressesWhitelisted < maxWhitelistedAddresses, "Whitelist limit reached");
         require(!whitelistedAddresses[msg.sender],"You are already whitelisted");
@@ -221,7 +214,6 @@ contract TrustyFactory is Ownable {
         
         // Increase the number of whitelisted addresses
         numAddressesWhitelisted += 1;
-        //return contracts[_contractIndex].removeAddressFromWhitelist(addresses);
     }
 
     /**
@@ -230,7 +222,7 @@ contract TrustyFactory is Ownable {
     * @custom:owner Can be called by Factory owner
     */
     function setMaxWhitelist(uint8 _maxWhitelistedAddresses) public onlyOwner {
-        maxWhitelistedAddresses =  _maxWhitelistedAddresses; // TODO:
+        maxWhitelistedAddresses = _maxWhitelistedAddresses;
     }
 
     /**
@@ -239,8 +231,8 @@ contract TrustyFactory is Ownable {
     * @custom:owner Can be called by Factory owner
     */
     function addToFactoryWhitelist(address[] memory addresses) public onlyOwner {
-        // check if the numAddressesWhitelisted < maxWhitelistedAddresses, if not then throw an error.
-        require(numAddressesWhitelisted < maxWhitelistedAddresses, "Whitelist limit reached");
+        // check if numAddressesWhitelisted + addresses.length < maxWhitelistedAddresses, if not then throw an error.
+        require(numAddressesWhitelisted + addresses.length < maxWhitelistedAddresses, "Whitelist limit reached");
         
         for (uint i = 0; i < addresses.length; i++) {
             // Add the address which called the function to the whitelistedAddress array

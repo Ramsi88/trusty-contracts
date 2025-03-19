@@ -51,7 +51,6 @@ contract Recovery is ReentrancyGuard {
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    //Transaction[] public transactions;
     mapping(uint => Transaction) public transactions;
 
     // whitelist
@@ -78,7 +77,6 @@ contract Recovery is ReentrancyGuard {
     }
 
     modifier txExists(uint _txIndex) {
-        //require(_txIndex < transactions.length, "tx does not exist");
         require(transactions[_txIndex].exists, "tx does not exist");
         _;
     }
@@ -139,8 +137,6 @@ contract Recovery is ReentrancyGuard {
         uint _value,
         bytes calldata _data
     ) public onlyOwner isWhitelisted(_to) notBlacklisted(_to) {
-        //uint txIndex = transactions.length;
-
         transactions[txIndex] =
             Transaction({
                 to: _to,
@@ -216,8 +212,6 @@ contract Recovery is ReentrancyGuard {
             "cannot execute tx due to number of confirmation required"
         );
 
-        //require(getBalance() > 0, "no amount");
-
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
         );
@@ -253,7 +247,6 @@ contract Recovery is ReentrancyGuard {
     * @return uint Returns the Trusty's total transactions as uint
     */
     function getTransactionCount() public view returns (uint) {
-        //return transactions.length;
         return txIndex;
     }
 

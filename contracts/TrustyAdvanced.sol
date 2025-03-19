@@ -57,7 +57,6 @@ contract TrustyAdvanced is ReentrancyGuard {
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    //Transaction[] public transactions;
     mapping(uint => Transaction) public transactions;
 
     // whitelist
@@ -102,12 +101,11 @@ contract TrustyAdvanced is ReentrancyGuard {
     }
 
     modifier onlyOwner() {
-        require(isOwner[msg.sender], "not owner"); //
+        require(isOwner[msg.sender], "not owner");
         _;
     }
 
     modifier txExists(uint _txIndex) {
-        //require(_txIndex < transactions.length, "tx does not exist");
         require(transactions[_txIndex].exists, "tx does not exist");
         _;
     }
@@ -169,7 +167,7 @@ contract TrustyAdvanced is ReentrancyGuard {
 
         blocklock = _blocklock;
 
-        unlock();
+        _unlock();
     }
 
     function getCaller(address sender, address source) internal view returns(address) {
@@ -181,17 +179,17 @@ contract TrustyAdvanced is ReentrancyGuard {
     }
 
     /**
-    * @notice Method used to update and reset the absolute timelock. Triggered after Transaction execution
+    * @notice Internal method used to update and reset the absolute timelock. Triggered after Transaction execution
     */
-    function unlock() private {
+    function _unlock() private {
         absolute_timelock = block.number + offset + blocklock;
     }
 
     /**
-    * @notice Method used to update and reset the absolute timelock. Triggered after Transaction execution
+    * @notice Method used to update and reset the absolute timelock. Triggered from Recovery
     */
-    function POR() external onlyRecover notUnlocked {
-        absolute_timelock = block.number + offset + blocklock;
+    function unlock() external onlyRecover notUnlocked {
+        _unlock();
     }
 
     /**
@@ -210,11 +208,9 @@ contract TrustyAdvanced is ReentrancyGuard {
     function recoverERC20(address _token) public onlyRecover notUnlocked {
         uint balance = IERC20(_token).balanceOf(address(this));
         require(balance > 0, "no amount");
-        //(bytes memory _dataApprove,) = encodeRecover(_token);
-        //(,bytes memory _dataTransfer) = encodeRecover(_token);
+
         bytes memory _dataTransfer = encodeRecover(_token);
-        //(bool approveSuccess, ) = _token.call{value: 0}(_dataApprove);
-        //require(approveSuccess, "recoverERC20 approve failed");
+
         (bool transferSuccess, ) = _token.call{value: 0}(_dataTransfer);
         require(transferSuccess, "recoverERC20 transfer failed");
     }
@@ -234,7 +230,7 @@ contract TrustyAdvanced is ReentrancyGuard {
             _recover,
             uint256(bytes32(_amount))
         );
-        //return (approve,transfer);
+
         return transfer;
     }
 
@@ -253,8 +249,6 @@ contract TrustyAdvanced is ReentrancyGuard {
         notLocked 
     {
         this.checkData(_data);
-
-        //uint txIndex = transactions.length;
 
         transactions[txIndex] =
             Transaction({
@@ -287,8 +281,6 @@ contract TrustyAdvanced is ReentrancyGuard {
         require(isOwner[origin], "not owner");
 
         this.checkData(_data);
-
-        //uint txIndex = transactions.length;
 
         transactions[txIndex] =
             Transaction({
@@ -397,8 +389,6 @@ contract TrustyAdvanced is ReentrancyGuard {
             "cannot execute tx due to number of confirmation required"
         );
 
-        //require(getBalance() > 0, "no amount");
-
         if (transaction.blockHeight + transaction.timeLock > block.number) {
             int blk = int(transaction.blockHeight + transaction.timeLock - block.number);
             revert TimeLock({err: "timeLock preventing execution: ",blockLeft: blk});
@@ -408,7 +398,7 @@ contract TrustyAdvanced is ReentrancyGuard {
 
         transaction.timestamp = block.timestamp;
 
-        unlock();
+        _unlock();
 
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
@@ -439,8 +429,6 @@ contract TrustyAdvanced is ReentrancyGuard {
             "cannot execute tx due to number of confirmation required"
         );
 
-        //require(getBalance() > 0, "no amount");
-
         if (transaction.blockHeight + transaction.timeLock > block.number) {
             int blk = int(transaction.blockHeight + transaction.timeLock - block.number);
             revert TimeLock({err: "timeLock preventing execution: ",blockLeft: blk});
@@ -455,7 +443,7 @@ contract TrustyAdvanced is ReentrancyGuard {
         );
         require(success, "tx failed");
 
-        unlock();
+        _unlock();
         
         emit ExecuteTransaction(origin, _txIndex);
     }
@@ -483,7 +471,6 @@ contract TrustyAdvanced is ReentrancyGuard {
     * @return uint Returns the Trusty's total transactions as uint
     */
     function getTransactionCount() public view returns (uint) {
-        //return transactions.length;
         return txIndex;
     }
 
@@ -615,19 +602,13 @@ contract TrustyAdvanced is ReentrancyGuard {
             bytes memory selector = bytes(abi.encode(bytes(encodedData[0:4])));
             bytes memory transfer = bytes(abi.encode(bytes(hex"a9059cbb")));
             bytes memory approve = bytes(abi.encode(bytes(hex"095ea7b3")));
-            bytes memory transferFrom = bytes(abi.encode(bytes(hex"23b872dd")));
-            //bytes memory mint = bytes(abi.encode(bytes(hex"40c10f19")));
             if (
                 keccak256(transfer) == keccak256(selector) || 
-                keccak256(approve) == keccak256(selector) ||
-                keccak256(transferFrom) == keccak256(selector) //||
-                //keccak256(mint) == keccak256(selector)
+                keccak256(approve) == keccak256(selector)
             ) {
                 bool passed = bool(
                     keccak256(transfer) == keccak256(selector) || 
-                    keccak256(approve) == keccak256(selector) || 
-                    keccak256(transferFrom) == keccak256(selector) //||
-                    //keccak256(mint) == keccak256(selector)
+                    keccak256(approve) == keccak256(selector)
                 );
                 
                 if (passed) {

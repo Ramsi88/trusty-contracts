@@ -52,7 +52,6 @@ contract Trusty is ReentrancyGuard {
     // mapping from tx index => owner => bool
     mapping(uint => mapping(address => bool)) public isConfirmed;
 
-    //Transaction[] public transactions;
     mapping(uint => Transaction) public transactions;
 
     modifier onlyOwner() {
@@ -61,7 +60,6 @@ contract Trusty is ReentrancyGuard {
     }
 
     modifier txExists(uint _txIndex) {
-        //require(_txIndex < transactions.length, "tx does not exist");
         require(transactions[_txIndex].exists, "tx does not exist");
         _;
     }
@@ -81,7 +79,6 @@ contract Trusty is ReentrancyGuard {
         address[] memory _owners, 
         uint _numConfirmationsRequired, 
         string memory _id
-        //,address proxy
     ) {
         require(_owners.length > 0, "owners required");
         
@@ -125,9 +122,6 @@ contract Trusty is ReentrancyGuard {
     * @dev _data can be used as "bytes memory" or "bytes calldata"
     */
     function submitTransaction(address _to, uint _value, bytes calldata _data) public onlyOwner {
-        
-        //uint txIndex = transactions.length;
-
         transactions[txIndex] =
             Transaction({
                 to: _to,
@@ -151,8 +145,6 @@ contract Trusty is ReentrancyGuard {
         address origin = getCaller(msg.sender, caller);
 
         require(isOwner[origin], "not owner");
-        
-        //uint txIndex = transactions.length;
 
         transactions[txIndex] =
             Transaction({
@@ -256,8 +248,6 @@ contract Trusty is ReentrancyGuard {
             "cannot execute tx due to number of confirmation required"
         );
 
-        //require(getBalance() > 0, "no amount");
-
         (bool success, ) = transaction.to.call{value: transaction.value}(
             transaction.data
         );
@@ -287,8 +277,6 @@ contract Trusty is ReentrancyGuard {
             transaction.numConfirmations >= numConfirmationsRequired,
             "cannot execute tx due to number of confirmation required"
         );
-
-        //require(getBalance() > 0, "no amount");
 
         transaction.executed = true;
         
@@ -326,7 +314,6 @@ contract Trusty is ReentrancyGuard {
     * @return uint Returns the Trusty's total transactions as uint
     */
     function getTransactionCount() public view returns (uint) {
-        //return transactions.length;
         return txIndex;
     }
 

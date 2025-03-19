@@ -339,17 +339,17 @@ describe("Trusty FACTORY tests", async () => {
                     const recoverWhitelist = await Recovery.addAddressToRecoveryWhitelist([trustyAddr]);
                     await recoverWhitelist.wait();
 
-                    const por = await Recovery.submitTransaction(trustyAddr, 0, "0x5c470ecb");
-                    await por.wait()
+                    const unlock = await Recovery.submitTransaction(trustyAddr, 0, "0xa69df4b5");
+                    await unlock.wait()
 
-                    const confirmPor = await Recovery.connect(accounts.randomAccount).confirmTransaction(0);
-                    await confirmPor.wait()
+                    const confirmUnlock = await Recovery.connect(accounts.randomAccount).confirmTransaction(0);
+                    await confirmUnlock.wait()
 
-                    const confirmPor2 = await Recovery.connect(accounts.other).confirmTransaction(0);
-                    await confirmPor2.wait()
+                    const confirmUnlock2 = await Recovery.connect(accounts.other).confirmTransaction(0);
+                    await confirmUnlock2.wait()
 
-                    const executePor = await Recovery.connect(accounts.other).executeTransaction(0);
-                    await executePor.wait();
+                    const executeUnlock = await Recovery.connect(accounts.other).executeTransaction(0);
+                    await executeUnlock.wait();
                 })
 
                 const txSend = await FactoryAdvanced.connect(accounts.owner).trustySubmit(0, accounts.anonymous.address, amount, "0x00", 100);
@@ -412,19 +412,19 @@ describe("Trusty FACTORY tests", async () => {
                 // Should fail execution if locked
                 await mine(BLOCKLOCK + 155).then(async () => {
                     await expect(FactoryAdvanced.connect(accounts.owner).trustyExecute(0,0)).to.be.revertedWith("Trusty is locked!")
-                    const por = await Recovery.submitTransaction(trustyAddr, 0, "0x5c470ecb");
-                    await por.wait()
+                    const unlock = await Recovery.submitTransaction(trustyAddr, 0, "0xa69df4b5");
+                    await unlock.wait()
 
                     //decodeCalldata((await Recovery.getTransaction(1))[2])
 
-                    const confirmPor = await Recovery.connect(accounts.randomAccount).confirmTransaction(1);
-                    await confirmPor.wait()
+                    const confirmUnlock = await Recovery.connect(accounts.randomAccount).confirmTransaction(1);
+                    await confirmUnlock.wait()
 
-                    const confirmPor2 = await Recovery.connect(accounts.other).confirmTransaction(1);
-                    await confirmPor2.wait()
+                    const confirmUnlock2 = await Recovery.connect(accounts.other).confirmTransaction(1);
+                    await confirmUnlock2.wait()
 
-                    const executePor = await Recovery.connect(accounts.other).executeTransaction(1);
-                    await executePor.wait();
+                    const executeUnlock = await Recovery.connect(accounts.other).executeTransaction(1);
+                    await executeUnlock.wait();
                 })
 
                 const txExecute = await FactoryAdvanced.connect(accounts.owner).trustyExecute(0,0);
