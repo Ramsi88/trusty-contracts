@@ -52,9 +52,9 @@ const main = async () => {
 
   // Deploy locally the contract and wait for his availability 
   const Contract = await ContractFactory.deploy();
-  await Contract.deployed();
+  await Contract.waitForDeployment();
   
-  console.log("[TrustyFactory address]:", Contract.address);
+  console.log("[TrustyFactory address]:", await Contract.getAddress());
   console.log("[TrustyFactory Owner address]:", owner.address);
 
   // `_price` is a public-readable variable that can only be set by the TrustyFactory contract's owner/deployer by calling the proper method
@@ -62,7 +62,7 @@ const main = async () => {
   //console.log(`[previousPrice]: ${previousPrice}`)
 
   // Owner sets the price
-  const setPrice = await Contract.trustyPriceConfig(ethers.utils.parseEther("0.05"));
+  const setPrice = await Contract.trustyPriceConfig(ethers.parseEther("0.05"));
   //console.log(`[setPrice tx hash]: ${JSON.stringify(setPrice.hash)}`)
   
   // Attempt to change the price from a not owner account
@@ -90,15 +90,15 @@ const main = async () => {
 
   //const recovery = await ContractTrusty.deploy(owners, 2, "RECOVERY TRUSTY", owners, owner.address, {value:0});
   const recovery = await ContractRecovery.deploy(owners, 2, "RECOVERY TRUSTY", {value:0});
-  await recovery.deployed()
-  const recoveryAddr = recovery.address;
+  await recovery.waitForDeployment()
+  const recoveryAddr = await recovery.getAddress();
 
   console.log(`[RECOVERY ADDR]: ${recoveryAddr}`);
 
   // ERC20
   const erc20 = await ContractERC20.deploy()
-  await erc20.deployed()
-  const erc20Addr = erc20.address;
+  await erc20.waitForDeployment()
+  const erc20Addr = await erc20.getAddress();
   console.log(`[ERC20 address]: ${erc20Addr}`)
 
   // Create a Trusty multisignature
@@ -106,7 +106,7 @@ const main = async () => {
   //const create = await Contract.createContract(owners, 2, "first", [anonymous.address], {value:0}); //ethers.utils.parseEther("0.02")
   
   const Trusty = await ContractTrusty.deploy(owners, 2, "SingleTrusty",/*  [anonymous.address], recoveryAddr, BLOCKLOCK, */ {value:0});
-  await Trusty.deployed();
+  await Trusty.waitForDeployment();
 
   // Get created contract address
   const addr = await Contract.contracts(0);
@@ -131,13 +131,13 @@ const main = async () => {
 
   // Deposit into a Trusty using the Factory method `depostiContract()` and the index of the Trusty to be funded
   const amount = '123';
-  const deposit1 = await Contract.depositContract(0, amount,{value: ethers.utils.parseEther("111")});
-  const deposit3 = await Contract.depositContract(3, amount,{value: ethers.utils.parseEther(amount)});
+  const deposit1 = await Contract.depositContract(0, amount,{value: ethers.parseEther("111")});
+  const deposit3 = await Contract.depositContract(3, amount,{value: ethers.parseEther(amount)});
 
   // Simulate block height progress (mining)
   await mine(1).then(async () => {
     // Get the balance of a Trusty like an RPC
-    const factoryBalance = await hre.ethers.provider.getBalance(Contract.address);
+    const factoryBalance = await hre.ethers.provider.getBalance(await Contract.getAddress());
     //console.log("[Factory balance]:",factoryBalance, Contract.address);
   });
 
