@@ -1,9 +1,14 @@
-const { expect } = require("chai");
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
-const { mine } = require("@nomicfoundation/hardhat-network-helpers");
-const { loadFixture} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+// const { expect } = require("chai");
+// const hre = require("hardhat");
+// const { ethers } = require("hardhat");
+// const { mine } = require("@nomicfoundation/hardhat-network-helpers");
+// const { loadFixture} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
 //const { decodeCalldata } = require('../utils/calldata.js')
+
+import { expect } from "chai";
+import { describe, it } from "node:test";
+import hre from "hardhat";
+const { ethers, networkHelpers, provider } = await hre.network.connect();
 
 const accounts = {
     owner: "",
@@ -33,40 +38,37 @@ const BLOCKLOCK = 28800;
 describe("TRUSTY multisig tests", async () => {
     // Create various accounts signers for testing purpose
     const istantiateAccounts = async () => {
-        const addresses = await hre.ethers.getSigners();  
-
-        accounts.owner = addresses[0]
+        const addresses = await provider.request({ method: "eth_accounts" })
         
-        accounts.otherOwner = addresses[2]
-        accounts.otherOwner1 = addresses[3]
-        accounts.otherOwner2 = addresses[4]
-        accounts.otherAccount = addresses[1]
-        accounts.randomAccount = addresses[5]
-        accounts.other = addresses[6]
-        accounts.anonymous = addresses[7]
-        accounts.erc20contract = addresses[8]
-        accounts.recovery = addresses[8]
+        accounts.owner = await ethers.getSigner(addresses[0])
+        
+        accounts.otherOwner = await ethers.getSigner(addresses[2])
+        accounts.otherOwner1 = await ethers.getSigner(addresses[3])
+        accounts.otherOwner2 = await ethers.getSigner(addresses[4])
+        accounts.otherAccount = await ethers.getSigner(addresses[1])
+        accounts.randomAccount = await ethers.getSigner(addresses[5])
+        accounts.other = await ethers.getSigner(addresses[6])
+        accounts.anonymous = await ethers.getSigner(addresses[7])
+        accounts.erc20contract = await ethers.getSigner(addresses[8])
+        accounts.recovery = await ethers.getSigner(addresses[8])
     }
 
     // Handle the Trusty Multisignature Factory deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployFactory = async () => {
         istantiateAccounts()
-        const MusigFactory = await ethers.getContractFactory("TrustyFactory");
-        const musigFactory = await MusigFactory.deploy({ value: 0 });
+        const musigFactory = await ethers.deployContract("TrustyFactory");
         Factory = musigFactory
     }
 
     const deployFactoryAdvanced = async () => {
         istantiateAccounts()
-        const MusigFactory = await ethers.getContractFactory("TrustyFactoryAdvanced");
-        const musigFactory = await MusigFactory.deploy({ value: 0 });
+        const musigFactory = await ethers.deployContract("TrustyFactoryAdvanced");
         FactoryAdvanced = musigFactory
     }
 
     // Handle the Trusty Multisignature single deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployTrustySingle = async (owners, threshold = 2,id="") => {
-        const Musig = await ethers.getContractFactory("Trusty");
-        const musig = await Musig.deploy(owners, threshold, id, { value: 0 });
+        const musig = await ethers.deployContract("Trusty",[owners, threshold, id],/*  whitelist, recovery, BLOCKLOCK, */ { value: 0 });
         Trusty = musig
     }
 
@@ -77,23 +79,20 @@ describe("TRUSTY multisig tests", async () => {
     }
 
     const deployTrustyAdvanced = async (owners, threshold = 2,id="",whitelist=[], recovery, timelock = BLOCKLOCK) => {
-        const Musig = await ethers.getContractFactory("TrustyAdvanced");
-        const musig = await Musig.deploy(owners, threshold, id, whitelist, recovery, timelock, { value: 0 });
+        const musig = await ethers.deployContract("TrustyAdvanced", [owners, threshold, id, whitelist, recovery, timelock],  { value: 0 });
         Advanced = musig
     }
 
     // Handle the Trusty Multisignature Factory deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployRecovery = async (owners, threshold = 2, id="") => {    
-        const MusigRecovery = await ethers.getContractFactory("Recovery");
-        const musigRecovery = await MusigRecovery.deploy(owners, threshold, id, { value: 0 });
+        const musigRecovery = await ethers.deployContract("Recovery", [owners, threshold, id], { value: 0 });
         Recovery = musigRecovery
     }
 
     // Handle the Deploy of an ERC20 Token for testing purpose
     const deployErc20 = async () => {
-        const Erc20Contract = await ethers.getContractFactory("ERC20");
-        const erc20 = await Erc20Contract.deploy();
-        Erc20 = erc20
+        const Erc20Contract = await ethers.deployContract("ERC20");
+        Erc20 = Erc20Contract
     }
 
     // Deploy all contracts
@@ -115,7 +114,7 @@ describe("TRUSTY multisig tests", async () => {
 
     describe("Trusties tests", async () => {
         it("Deploy all test", async () => {
-            const result = await loadFixture(deployment);
+            const result = await networkHelpers.loadFixture(deployment);
             expect(result).to.be.equal(true)
 
             expect(await Erc20.getAddress() !== null)
@@ -155,7 +154,7 @@ describe("TRUSTY multisig tests", async () => {
         })
 
         it("Erc20.sol test", async () => {
-            await loadFixture(deployment)
+            await networkHelpers.loadFixture(deployment)
 
             const erc20addr = await Erc20.getAddress()
             expect(erc20addr !== null)
@@ -206,7 +205,7 @@ describe("TRUSTY multisig tests", async () => {
             })
 
             it("Deposit test", async () => {
-                const result = await loadFixture(deployment);
+                const result = await networkHelpers.loadFixture(deployment);
                 expect(result).to.be.equal(true)
 
                 const trustyAddr = await Trusty.getAddress()
@@ -215,11 +214,11 @@ describe("TRUSTY multisig tests", async () => {
                 
                 // Send ETH without `data`
                 await accounts.owner.sendTransaction({to: trustyAddr, value: amount});
-                expect(await hre.ethers.provider.getBalance(trustyAddr)).to.equal(amount);
+                expect(await ethers.provider.getBalance(trustyAddr)).to.equal(amount);
 
                 // Send ETH with `data`
                 await accounts.owner.sendTransaction({to: trustyAddr, value: amount, data: Buffer.from("test")});
-                expect(await hre.ethers.provider.getBalance(trustyAddr)).to.equal(BigInt(amount * 2n));
+                expect(await ethers.provider.getBalance(trustyAddr)).to.equal(BigInt(amount * 2n));
             })
 
             it('Submit, confirm, revoke, execute test', async () => {
@@ -330,7 +329,7 @@ describe("TRUSTY multisig tests", async () => {
             })
 
             it("Deposit test", async () => {
-                const result = await loadFixture(deployment);
+                const result = await networkHelpers.loadFixture(deployment);
                 expect(result).to.be.equal(true)
 
                 const trustyAddr = await Advanced.getAddress()
@@ -339,11 +338,11 @@ describe("TRUSTY multisig tests", async () => {
                 
                 // Send ETH without `data`
                 await accounts.owner.sendTransaction({to: trustyAddr, value: amount});
-                expect(await hre.ethers.provider.getBalance(trustyAddr)).to.equal(amount);
+                expect(await ethers.provider.getBalance(trustyAddr)).to.equal(amount);
 
                 // Send ETH with `data`
                 await accounts.owner.sendTransaction({to: trustyAddr, value: amount, data: Buffer.from("test")});
-                expect(await hre.ethers.provider.getBalance(trustyAddr)).to.equal(BigInt(amount * 2n));
+                expect(await ethers.provider.getBalance(trustyAddr)).to.equal(BigInt(amount * 2n));
             })
 
             it('Submit, confirm, revoke, execute test', async () => {
@@ -374,11 +373,11 @@ describe("TRUSTY multisig tests", async () => {
                 // Shoul fail PoR if not locked
                 await expect(Advanced.connect(accounts.anonymous).unlock()).to.be.revertedWith("Trusty not yet unlocked!")
 
-                await mine(BLOCKLOCK + 120).then(async () => {
+                await networkHelpers.mine(BLOCKLOCK + 120).then(async () => {
                     // Should fail submitting transaction if locked
                     await expect(Advanced.connect(accounts.owner).submitTransaction(trustyAddr, 1, "0xce746024", 0)).to.be.revertedWith("Trusty is locked!")
                 })
-
+                
                 // Shoul fail PoR from not recovery
                 await expect(Advanced.connect(accounts.owner).unlock()).to.be.revertedWith("Not allowed!")
 
@@ -434,12 +433,13 @@ describe("TRUSTY multisig tests", async () => {
 
                 // Should fail if relative timelock has not passed
                 await expect(Advanced.connect(accounts.other).executeTransaction(0)).to.be.revertedWithCustomError(Advanced, "TimeLock")
-
-                await mine(timelock + 120).then(async () => {
+                
+                await networkHelpers.mine(timelock + 120).then(async () => {
                     // Should fail if absolute timelock has passed
                     await expect(Advanced.connect(accounts.other).executeTransaction(0)).to.be.revertedWith("Trusty is locked!")
-
-                    await Advanced.connect(accounts.anonymous).unlock()
+                    
+                    const unlock = await Advanced.connect(accounts.anonymous).unlock()
+                    await unlock.wait()
 
                     const executeTx = await Advanced.connect(accounts.other).executeTransaction(0)
                     await executeTx.wait()

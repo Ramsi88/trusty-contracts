@@ -1,5 +1,9 @@
-const { expect } = require("chai");
-const { decodeCalldata } = require('../utils/calldata.js')
+//const { expect } = require("chai");
+//const { decodeCalldata } = require('../utils/calldata.js')
+
+import { expect } from "chai";
+import { describe, it } from "node:test";
+import decodeCalldata from "../utils/calldata.js";
 
 describe("Utils tests", async () => {
     it("Decode calldata test", async () => {

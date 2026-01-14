@@ -1,8 +1,13 @@
-const { expect } = require("chai");
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
-const { mine } = require("@nomicfoundation/hardhat-network-helpers");
-const { loadFixture} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+//const { expect } = require("chai");
+//const hre = require("hardhat");
+//const { ethers } = require("hardhat");
+//const { mine } = require("@nomicfoundation/hardhat-network-helpers");
+//const { loadFixture} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+
+import { expect } from "chai";
+import { describe, it } from "node:test";
+import hre from "hardhat";
+const { ethers, networkHelpers, provider } = await hre.network.connect();
 
 const accounts = {
     owner: "",
@@ -32,40 +37,40 @@ const BLOCKLOCK = 28800;
 describe("Trusty DEPLOY tests", async () => {
     // Create various accounts signers for testing purpose
     const istantiateAccounts = async () => {
-        const addresses = await hre.ethers.getSigners();  
-
-        accounts.owner = addresses[0]
+        const addresses = await provider.request({ method: "eth_accounts" }) //await ethers.getSigners();  
+        //console.log(addresses)
+        accounts.owner = await ethers.getSigner(addresses[0])
         
-        accounts.otherOwner = addresses[2]
-        accounts.otherOwner1 = addresses[3]
-        accounts.otherOwner2 = addresses[4]
-        accounts.otherAccount = addresses[1]
-        accounts.randomAccount = addresses[5]
-        accounts.other = addresses[6]
-        accounts.anonymous = addresses[7]
-        accounts.erc20contract = addresses[8]
-        accounts.recovery = addresses[8]
+        accounts.otherOwner = await ethers.getSigner(addresses[2])
+        accounts.otherOwner1 = await ethers.getSigner(addresses[3])
+        accounts.otherOwner2 = await ethers.getSigner(addresses[4])
+        accounts.otherAccount = await ethers.getSigner(addresses[1])
+        accounts.randomAccount = await ethers.getSigner(addresses[5])
+        accounts.other = await ethers.getSigner(addresses[6])
+        accounts.anonymous = await ethers.getSigner(addresses[7])
+        accounts.erc20contract = await ethers.getSigner(addresses[8])
+        accounts.recovery = await ethers.getSigner(addresses[8])
     }
 
     // Handle the Trusty Multisignature Factory deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployFactory = async () => {
         istantiateAccounts()
-        const MusigFactory = await ethers.getContractFactory("TrustyFactory");
-        const musigFactory = await MusigFactory.deploy({ value: 0 });
+        const musigFactory = await ethers.deployContract("TrustyFactory");
+        //const musigFactory = await MusigFactory.deploy({ value: 0 });
         Factory = musigFactory
     }
 
     const deployFactoryAdvanced = async () => {
         istantiateAccounts()
-        const MusigFactory = await ethers.getContractFactory("TrustyFactoryAdvanced");
-        const musigFactory = await MusigFactory.deploy({ value: 0 });
+        const musigFactory = await ethers.deployContract("TrustyFactoryAdvanced");
+        //const musigFactory = await MusigFactory.deploy({ value: 0 });
         FactoryAdvanced = musigFactory
     }
 
     // Handle the Trusty Multisignature single deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployTrustySingle = async (owners, threshold = 2,id="") => {
-        const Musig = await ethers.getContractFactory("Trusty");
-        const musig = await Musig.deploy(owners, threshold, id,/*  whitelist, recovery, BLOCKLOCK, */ { value: 0 });
+        const musig = await ethers.deployContract("Trusty",[owners, threshold, id],/*  whitelist, recovery, BLOCKLOCK, */ { value: 0 });
+        //const musig = await Musig.deploy(owners, threshold, id,/*  whitelist, recovery, BLOCKLOCK, */ { value: 0 });
         Trusty = musig
     }
 
@@ -76,30 +81,30 @@ describe("Trusty DEPLOY tests", async () => {
     }
 
     const deployTrustyAdvanced = async (owners, threshold = 2,id="",whitelist=[], recovery) => {
-        const Musig = await ethers.getContractFactory("TrustyAdvanced");
-        const musig = await Musig.deploy(owners, threshold, id, whitelist, recovery, BLOCKLOCK, { value: 0 });
+        const musig = await ethers.deployContract("TrustyAdvanced", [owners, threshold, id, whitelist, recovery, BLOCKLOCK],  { value: 0 });
+        //const musig = await Musig.deploy(owners, threshold, id, whitelist, recovery, BLOCKLOCK, { value: 0 });
         Advanced = musig
     }
 
     // Handle the Trusty Multisignature Factory deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployRecovery = async (owners, threshold = 2, id="") => {    
-        const MusigRecovery = await ethers.getContractFactory("Recovery");
-        const musigRecovery = await MusigRecovery.deploy(owners, threshold, id, { value: 0 });
+        const musigRecovery = await ethers.deployContract("Recovery", [owners, threshold, id], { value: 0 });
+        //const musigRecovery = await MusigRecovery.deploy(owners, threshold, id, { value: 0 });
         Recovery = musigRecovery
     }
 
     // Handle the Deploy of an ERC20 Token for testing purpose
     const deployErc20 = async () => {
-        const Erc20Contract = await ethers.getContractFactory("ERC20");
-        const erc20 = await Erc20Contract.deploy();
-        Erc20 = erc20
+        const Erc20Contract = await ethers.deployContract("ERC20");
+        //const erc20 = await Erc20Contract.deploy();
+        Erc20 = Erc20Contract
     }
 
     // Deploy all contracts
     async function deployment() {
         await istantiateAccounts()
         const owners = [accounts.owner.address, accounts.randomAccount.address, accounts.other.address];
-        
+
         await deployFactory()
         await deployFactoryAdvanced()
         await deployErc20()
@@ -113,10 +118,10 @@ describe("Trusty DEPLOY tests", async () => {
     }
 
     //it("Deploy tests", async () => { 
-        it("Deploy all test", async () => {
-            const result = await loadFixture(deployment);
+        it.only("Deploy all test", async () => {
+            const result = await networkHelpers.loadFixture(deployment);
             expect(result).to.be.equal(true)
-
+            
             expect(await Erc20.getAddress() !== null)
             expect(await Recovery.getAddress() !== null)
             expect(await Factory.getAddress() !== null)

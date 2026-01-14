@@ -1,7 +1,8 @@
-const createKeccakHash = require('keccak')
+//const createKeccakHash = require('keccak')
+import createKeccakHash from 'keccak';
 //const { ethers } = require("hardhat");
 
-function decodeCalldata(data) {
+export default function decodeCalldata(data) {
     /**
      * - approve(address,uint256) = 0x095ea7b3
      * - transfer(address,uint256) = 0xa9059cbb
@@ -107,4 +108,4 @@ function toChecksumAddress (address) {
     return ret
 }
 
-module.exports.decodeCalldata = decodeCalldata;
+//module.exports.decodeCalldata = decodeCalldata;

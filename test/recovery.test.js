@@ -1,9 +1,14 @@
-const { expect } = require("chai");
-const hre = require("hardhat");
-const { ethers } = require("hardhat");
-const { mine } = require("@nomicfoundation/hardhat-network-helpers");
-const { loadFixture} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
-const { decodeCalldata } = require('../utils/calldata.js')
+//const { expect } = require("chai");
+//const hre = require("hardhat");
+//const { ethers } = require("hardhat");
+//const { mine } = require("@nomicfoundation/hardhat-network-helpers");
+//const { loadFixture} = require("@nomicfoundation/hardhat-toolbox/network-helpers");
+//const { decodeCalldata } = require('../utils/calldata.js')
+
+import { expect } from "chai";
+import { describe, it } from "node:test";
+import hre from "hardhat";
+const { ethers, networkHelpers, provider } = await hre.network.connect();
 
 const accounts = {
     owner: "",
@@ -33,40 +38,37 @@ const BLOCKLOCK = 28800;
 describe("Trusty RECOVERY tests", async () => {
     // Create various accounts signers for testing purpose
     const istantiateAccounts = async () => {
-        const addresses = await hre.ethers.getSigners();  
-
-        accounts.owner = addresses[0]
+        const addresses = await provider.request({ method: "eth_accounts" })
         
-        accounts.otherOwner = addresses[2]
-        accounts.otherOwner1 = addresses[3]
-        accounts.otherOwner2 = addresses[4]
-        accounts.otherAccount = addresses[1]
-        accounts.randomAccount = addresses[5]
-        accounts.other = addresses[6]
-        accounts.anonymous = addresses[7]
-        accounts.erc20contract = addresses[8]
-        accounts.recovery = addresses[8]
+        accounts.owner = await ethers.getSigner(addresses[0])
+        
+        accounts.otherOwner = await ethers.getSigner(addresses[2])
+        accounts.otherOwner1 = await ethers.getSigner(addresses[3])
+        accounts.otherOwner2 = await ethers.getSigner(addresses[4])
+        accounts.otherAccount = await ethers.getSigner(addresses[1])
+        accounts.randomAccount = await ethers.getSigner(addresses[5])
+        accounts.other = await ethers.getSigner(addresses[6])
+        accounts.anonymous = await ethers.getSigner(addresses[7])
+        accounts.erc20contract = await ethers.getSigner(addresses[8])
+        accounts.recovery = await ethers.getSigner(addresses[8])
     }
 
     // Handle the Trusty Multisignature Factory deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployFactory = async () => {
         istantiateAccounts()
-        const MusigFactory = await ethers.getContractFactory("TrustyFactory");
-        const musigFactory = await MusigFactory.deploy({ value: 0 });
+        const musigFactory = await ethers.deployContract("TrustyFactory");
         Factory = musigFactory
     }
 
     const deployFactoryAdvanced = async () => {
         istantiateAccounts()
-        const MusigFactory = await ethers.getContractFactory("TrustyFactoryAdvanced");
-        const musigFactory = await MusigFactory.deploy({ value: 0 });
+        const musigFactory = await ethers.deployContract("TrustyFactoryAdvanced");
         FactoryAdvanced = musigFactory
     }
 
     // Handle the Trusty Multisignature single deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployTrustySingle = async (owners, threshold = 2,id="") => {
-        const Musig = await ethers.getContractFactory("Trusty");
-        const musig = await Musig.deploy(owners, threshold, id,/*  whitelist, recovery, BLOCKLOCK, */ { value: 0 });
+        const musig = await ethers.deployContract("Trusty",[owners, threshold, id],/*  whitelist, recovery, BLOCKLOCK, */ { value: 0 });
         Trusty = musig
     }
 
@@ -77,23 +79,20 @@ describe("Trusty RECOVERY tests", async () => {
     }
 
     const deployTrustyAdvanced = async (owners, threshold = 2,id="",whitelist=[], recovery) => {
-        const Musig = await ethers.getContractFactory("TrustyAdvanced");
-        const musig = await Musig.deploy(owners, threshold, id, whitelist, recovery, BLOCKLOCK, { value: 0 });
+        const musig = await ethers.deployContract("TrustyAdvanced", [owners, threshold, id, whitelist, recovery, BLOCKLOCK],  { value: 0 });
         Advanced = musig
     }
 
     // Handle the Trusty Multisignature Factory deploy for each test that needs an istance to run and fill the necessary accounts signers
     const deployRecovery = async (owners, threshold = 2, id="") => {    
-        const MusigRecovery = await ethers.getContractFactory("Recovery");
-        const musigRecovery = await MusigRecovery.deploy(owners, threshold, id, { value: 0 });
+        const musigRecovery = await ethers.deployContract("Recovery", [owners, threshold, id], { value: 0 });
         Recovery = musigRecovery
     }
 
     // Handle the Deploy of an ERC20 Token for testing purpose
     const deployErc20 = async () => {
-        const Erc20Contract = await ethers.getContractFactory("ERC20");
-        const erc20 = await Erc20Contract.connect(accounts.owner).deploy();
-        Erc20 = erc20
+        const Erc20Contract = await ethers.deployContract("ERC20");
+        Erc20 = Erc20Contract
     }
 
     // Deploy all contracts
@@ -158,7 +157,7 @@ describe("Trusty RECOVERY tests", async () => {
             expect(blacklistArray.length).to.be.equal(1)
 
             // RECOVER
-
+            
             //0xce746024 //0x7c0f1ee7
             const recoverEth = await Recovery.connect(accounts.owner).submitTransaction(trustyAddr, 0, "0xce746024");
             await recoverEth.wait()
@@ -167,7 +166,7 @@ describe("Trusty RECOVERY tests", async () => {
 
             // Should fail recover by not recovery address
             await expect(Advanced.connect(accounts.owner).recover()).to.be.revertedWith("Not allowed!")
-
+            
             let confirm = await Recovery.connect(accounts.owner).confirmTransaction(0);
             await confirm.wait()
 
@@ -187,13 +186,13 @@ describe("Trusty RECOVERY tests", async () => {
             await expect(Recovery.connect(accounts.anonymous).executeTransaction(0)).to.be.revertedWith("not owner")
             
             // AWAIT for number of block equal to BLOCKLOCK + OFFSET - number of already executed tx calls
-            await mine(BLOCKLOCK + 108).then(async () => {
+            await networkHelpers.mine(BLOCKLOCK + 110).then(async () => {
                 const executeRecoverEth = await Recovery.connect(accounts.owner).executeTransaction(0);
                 await executeRecoverEth.wait();
                 expect(await Advanced.getBalance()).to.be.eq(0n)
                 expect(await Recovery.getBalance()).to.be.eq(1000000000000000000n)
             })
-
+            
             // ERC20 Recovery
             const erc20recover = await Recovery.connect(accounts.owner).submitTransaction(trustyAddr, 0, `0x9e8c708e000000000000000000000000${erc20Addr.slice(2,erc20Addr.length)}`);
             await erc20recover.wait()
@@ -249,7 +248,7 @@ describe("Trusty RECOVERY tests", async () => {
         })
 
         it('Whitelist & Blacklist test', async () => {
-            const result = await loadFixture(deployment);
+            const result = await networkHelpers.loadFixture(deployment);
             expect(result).to.be.equal(true)
 
             const trustyAddr = await Advanced.getAddress()
@@ -303,7 +302,7 @@ describe("Trusty RECOVERY tests", async () => {
         })
 
         it('Submit, confirm, revoke, execute test', async () => {
-            //const result = await loadFixture(deployment);
+            //const result = await networkHelpers.loadFixture(deployment);
             //expect(result).to.be.equal(true)
 
             const owners = [accounts.owner.address, accounts.randomAccount.address, accounts.other.address];
@@ -359,7 +358,7 @@ describe("Trusty RECOVERY tests", async () => {
             // Should fail recover when Timelock is not reached
             await expect(Recovery.connect(accounts.other).executeTransaction(0)).to.be.revertedWith("tx failed")
 
-            await mine(BLOCKLOCK + 108).then(async () => {
+            await networkHelpers.mine(BLOCKLOCK + 114).then(async () => {
                 // Should fail without amount to recover
                 await expect(Recovery.connect(accounts.other).executeTransaction(0)).to.be.revertedWith("tx failed")
 
@@ -386,12 +385,12 @@ describe("Trusty RECOVERY tests", async () => {
             const trustyAddr = await Advanced.getAddress()
             const recoveryAddr = await Recovery.getAddress()
 
-            expect(await hre.ethers.provider.getBalance(trustyAddr)).to.equal(0n);
+            expect(await ethers.provider.getBalance(trustyAddr)).to.equal(0n);
 
             const amount = ethers.parseEther("1")            
             await accounts.owner.sendTransaction({to: trustyAddr, value: amount});
 
-            expect(await hre.ethers.provider.getBalance(trustyAddr)).to.equal(amount);
+            expect(await ethers.provider.getBalance(trustyAddr)).to.equal(amount);
 
             // Recovery Whitelist
             const whitelist = await Recovery.connect(accounts.owner).addAddressToRecoveryWhitelist([trustyAddr])
@@ -408,11 +407,11 @@ describe("Trusty RECOVERY tests", async () => {
             const confirmTx2 = await Recovery.connect(accounts.other).confirmTransaction(0)
             await confirmTx2.wait()
 
-            await mine(BLOCKLOCK + 120).then(async () => {
+            await networkHelpers.mine(BLOCKLOCK + 120).then(async () => {
                 const executeTx = await Recovery.connect(accounts.other).executeTransaction(0)
                 await executeTx.wait()
 
-                expect(await hre.ethers.provider.getBalance(recoveryAddr)).to.equal(amount);
+                expect(await ethers.provider.getBalance(recoveryAddr)).to.equal(amount);
             })
         })
 
@@ -455,7 +454,7 @@ describe("Trusty RECOVERY tests", async () => {
             await Advanced.connect(accounts.owner).addAddressToBlacklist([accounts.otherOwner.address])
             await expect(Advanced.connect(accounts.owner).submitTransaction(erc20Addr, erc20OwnerBalance, "0xa9059cbb0000000000000000000000003C44CdDdB6a900fa2b585dd299e03d12FA4293BC00000000000000000000000000000000000000000052b7d2dcc80cd400000000", 0)).to.be.revertedWith("Address in calldata is blacklisted!")
 
-            await mine(BLOCKLOCK + 125).then(async () => {
+            await networkHelpers.mine(BLOCKLOCK + 125).then(async () => {
                 // Should fail recover if balance is 0
                 await expect(Recovery.connect(accounts.other).executeTransaction(0)).to.be.revertedWith("tx failed")
 
