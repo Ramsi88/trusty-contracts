@@ -10,3 +10,6 @@ cache
 artifacts
 
 .DS_Store
+
+#Ignition
+ignition/deployments

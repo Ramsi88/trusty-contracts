@@ -1,12 +1,8 @@
-//const { ethers } = require("hardhat");
-//import ethers from 'hardhat';
-//import hre from "hardhat";
-//const { provider } = await hre.network.connect();
+import * as dotenv from "dotenv";
+dotenv.config();
 
 import { network } from "hardhat";
-const { viem, networkName, ethers, provider, networkHelpers } = await network.connect();
-
-const client = await viem.getPublicClient();
+const { networkName, ethers, provider, networkHelpers } = await network.connect();
 
 console.log(`Deploying to Network ${networkName}...`);
 
@@ -20,18 +16,13 @@ if (accounts !== null) {
   console.log("No accounts found");
 }
 
-//const { mine } = require("@nomicfoundation/hardhat-network-helpers");
-import mine from '@nomicfoundation/hardhat-network-helpers';
-//require("@nomicfoundation/hardhat-ledger");
-//require("dotenv").config({ path: ".env" });
-//const prompt = require('prompt-sync')();
 
 const { PRIVATE_KEY, LEDGER_ADDRESS, MNEMONIC, PASSPHRASE } = process.env;
 
 const useLedger = false;
 const ledgerAddress = LEDGER_ADDRESS;
 
-function toHex(str) {
+function toHex(str: string) {
     var result = '';
     for (var i = 0; i < str.length; i++) {
         result += str.charCodeAt(i).toString(16);
@@ -40,22 +31,22 @@ function toHex(str) {
 }
 
 const main = async () => {
-    // if(useLedger){
-    //     const txt = toHex("");
-    //     //const message = `0x${txt}`
-    //     const message = "0x5b3078726d735d3a207468697320697320612074657374206d65737361676521";
-    //     const account = ledgerAddress;
+    if(useLedger){
+        const txt = toHex("");
+        //const message = `0x${txt}`
+        const message = "0x5b3078726d735d3a207468697320697320612074657374206d65737361676521";
+        const account = ledgerAddress;
 
-    //     const signature = await hre.network.provider.request({
-    //         method: "personal_sign",
-    //         params: [
-    //         message,
-    //         account,
-    //         ],
-    //     });
+        const signature = await provider.request({
+            method: "personal_sign",
+            params: [
+                message,
+                account,
+            ],
+        });
 
-    //     console.log("Signed message", message, "for Ledger account", account, "and got", signature);
-    // }
+        console.log("Signed message", message, "for Ledger account", account, "and got", signature);
+    }
 
     const ABSOLUTE_TIMELOCK = 28800;
     const OFFSET = 120;
@@ -64,14 +55,14 @@ const main = async () => {
     // Get signers's account object from hardhat runtime environment.
     // By default, Contract instances are connected to the first signer.
     const [owner, randomAccount, other, anonymous] = await Promise.all(
-        accounts.map((el) => ethers.getSigner(el))
-    ); //await hre.ethers.getSigners();
+        accounts.map((el: any) => ethers.getSigner(el))
+    );
 
     // Get the contract's code to be deployed from `contracts/TrustyFactory.sol`
     const ContractFactory = await ethers.deployContract("TrustyFactory");
-    //const ContractTrusty = await viem.deployContract("Trusty");
-    //const ContractRecovery = await viem.deployContract("Recovery");
-    //const ContractERC20 = await viem.deployContract("ERC20");
+    //const ContractTrusty = await ethers.deployContract("Trusty");
+    //const ContractRecovery = await ethers.deployContract("Recovery");
+    //const ContractERC20 = await ethers.deployContract("ERC20");
     
     // Deploy locally the contract and wait for his availability 
     const Contract = ContractFactory;
