@@ -1,5 +1,46 @@
 # Trusty-Contracts Project
 
+## Description
+
+### Trusty
+
+> Base contract for multisignatures operations allowing configuration from 1ofX owners.
+> It support ERC20 Tokens and lets the interaction via calldata with others contracts
+
+Transaction operations
+
+- Transaction proposal
+
+- Transaction confirm
+
+- Transaction revoke
+  
+- Transaction execution
+
+### TrustyAdvanced
+
+>Advanced contract that extends the base one and introduce a Recovery System, an Absolute and Relative Timelock for transaction execution and contract locking, a Whitelist and Blacklist system
+
+Operations
+
+- Unlock
+
+- Recover
+
+- Recover ERC20
+
+### Recovery
+
+>Independent multisignature contract that extends the base one and is used in Recovery scenario to store funds from an Advanced multisignature contract.
+
+### TrustyFactory
+
+>Contract used as a service to deploy different Trusty base multisignature and interact with them as proxy
+
+### TrustyFactoryAdvanced
+
+>Contract used as a service to deploy differnt TrustyAdvanced multisignature and interact with them as a proxy
+
 ## Setup
 
 - Clone the repository and `cd` into it
